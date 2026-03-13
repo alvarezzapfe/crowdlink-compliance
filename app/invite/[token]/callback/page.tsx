@@ -1,9 +1,10 @@
 'use client'
-import { useEffect } from 'react'
+import React, { useEffect } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import { cl } from '@/lib/design'
 
-export default function InviteCallbackPage({ params }: { params: { token: string } }) {
+export default function InviteCallbackPage({ params }: { params: Promise<{ token: string }> }) {
+  const { token: tokenParam } = React.use(params)
   useEffect(() => {
     const finalize = async () => {
       try {
@@ -18,7 +19,7 @@ export default function InviteCallbackPage({ params }: { params: { token: string
 
         const { data: { session: session2 } } = await supabase.auth.getSession()
         if (!session2?.user) {
-          window.location.href = `/invite/${params.token}`
+          window.location.href = `/invite/${tokenParam}`
           return
         }
 
@@ -29,7 +30,7 @@ export default function InviteCallbackPage({ params }: { params: { token: string
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session2.access_token}`,
           },
-          body: JSON.stringify({ token: params.token }),
+          body: JSON.stringify({ token: tokenParam }),
         })
 
         // Redirigir al wizard

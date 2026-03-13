@@ -6,7 +6,8 @@ import { IconCheck, IconX, IconClock, IconShield } from '@/components/Icons'
 
 type State = 'loading' | 'valid' | 'used' | 'expired' | 'invalid' | 'authenticating' | 'done' | 'error'
 
-export default function InvitePage({ params }: { params: { token: string } }) {
+export default function InvitePage({ params }: { params: Promise<{ token: string }> }) {
+  const { token: tokenParam } = React.use(params)
   const [state, setState] = useState<State>('loading')
   const [invitation, setInvitation] = useState<{ email: string; nombre_empresa: string } | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
@@ -17,7 +18,7 @@ export default function InvitePage({ params }: { params: { token: string } }) {
 
   const validateToken = async () => {
     try {
-      const token = params.token
+      const token = tokenParam
 
       // Validar formato UUID básico antes de consultar
       const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -60,7 +61,7 @@ export default function InvitePage({ params }: { params: { token: string } }) {
       const { error } = await supabase.auth.signInWithOtp({
         email: invitation.email,
         options: {
-          emailRedirectTo: `${window.location.origin}/invite/${params.token}/callback`,
+          emailRedirectTo: `${window.location.origin}/invite/${tokenParam}/callback`,
           shouldCreateUser: true,
         },
       })

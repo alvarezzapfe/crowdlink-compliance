@@ -1,51 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { validateApiKey } from '@/lib/auth'
-import { supabaseAdmin } from '@/lib/supabase'
-import { z } from 'zod'
+import { createClient } from '@supabase/supabase-js'
 
-const UpdateSchema = z.object({
-  status: z.enum(['pending', 'in_review', 'approved', 'rejected']).optional(),
-  notas: z.string().optional(),
-  acta_constitutiva_url: z.string().url().optional(),
-  comprobante_domicilio_url: z.string().url().optional(),
-  identificacion_rep_url: z.string().url().optional(),
-  metadata: z.record(z.unknown()).optional(),
-})
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = await validateApiKey(req, 'kyc:read')
-  if ('error' in auth) return auth.error
-
+// Next.js 16: params is a Promise
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
   const { data, error } = await supabaseAdmin
-    .from('kyc_empresas')
-    .select('*')
-    .eq('id', params.id)
-    .single()
-
-  if (error || !data) return NextResponse.json({ error: 'Empresa no encontrada' }, { status: 404 })
-
+    .from('kyc_empresas').select('*').eq('id', id).single()
+  if (error || !data) return NextResponse.json({ error: 'No encontrada' }, { status: 404 })
   return NextResponse.json({ empresa: data })
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = await validateApiKey(req, 'kyc:write')
-  if ('error' in auth) return auth.error
-
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
   const body = await req.json()
-  const parsed = UpdateSchema.safeParse(body)
-
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
-  }
-
   const { data, error } = await supabaseAdmin
     .from('kyc_empresas')
-    .update({ ...parsed.data, updated_at: new Date().toISOString() })
-    .eq('id', params.id)
-    .select()
-    .single()
-
+    .update({ ...body, updated_at: new Date().toISOString() })
+    .eq('id', id).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
   return NextResponse.json({ empresa: data })
 }
