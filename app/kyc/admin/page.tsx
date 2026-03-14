@@ -151,6 +151,18 @@ export default function KycAdminPage() {
     setInvCreating(false)
   }
 
+  const sendInvEmail = async (inv: Invitation) => {
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token || sessionToken
+    await fetch('/api/v1/invitations/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ invitation_id: inv.id }),
+    })
+    alert(`Email enviado a ${inv.email}`)
+  }
+
   const copyInvLink = async (url: string) => {
     await navigator.clipboard.writeText(url)
     setInvCopied(true); setTimeout(() => setInvCopied(false), 2000)
@@ -562,9 +574,12 @@ export default function KycAdminPage() {
                 <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '1rem', marginBottom: '1rem' }}>
                   <div style={{ color: '#94A3B8', fontSize: '0.65rem', fontWeight: '700', letterSpacing: '0.08em', marginBottom: '0.4rem' }}>LINK DE INVITACIÓN</div>
                   <div style={{ color: '#475569', fontSize: '0.75rem', fontFamily: 'monospace', wordBreak: 'break-all', marginBottom: '0.75rem', lineHeight: 1.5 }}>{invJustCreated.invite_url}</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
                     <button onClick={() => copyInvLink(invJustCreated.invite_url || '')} style={{ background: invCopied ? '#ECFDF5' : 'white', border: `1.5px solid ${invCopied ? '#6EE7B7' : '#E2E8F0'}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.8rem', fontWeight: '600', color: invCopied ? '#065F46' : '#374151', cursor: 'pointer', fontFamily: font }}>
                       {invCopied ? '¡Copiado!' : 'Copiar link'}
+                    </button>
+                    <button onClick={() => sendInvEmail(invJustCreated)} style={{ background: '#0F7BF4', border: 'none', borderRadius: '8px', padding: '0.6rem', fontSize: '0.8rem', fontWeight: '600', color: 'white', cursor: 'pointer', fontFamily: font }}>
+                      Enviar email
                     </button>
                     <button onClick={() => { setInvQrModal(invJustCreated); setShowInvModal(false) }} style={{ background: '#EBF3FF', border: '1.5px solid #BFDBFE', borderRadius: '8px', padding: '0.6rem', fontSize: '0.8rem', fontWeight: '600', color: '#0F7BF4', cursor: 'pointer', fontFamily: font }}>
                       Ver QR
