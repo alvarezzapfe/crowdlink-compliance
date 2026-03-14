@@ -16,13 +16,25 @@ export async function POST(req: NextRequest) {
     const { data: profile } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
     if (profile?.role !== 'admin') return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
-    const { invitation_id } = await req.json()
-    const { data: inv } = await supabaseAdmin.from('invitations').select('*').eq('id', invitation_id).single()
-    if (!inv) return NextResponse.json({ error: 'Invitación no encontrada' }, { status: 404 })
+    const body = await req.json()
+    const { invitation_id, email, invite_url: directUrl, nombre_empresa: directNombre } = body
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://crowdlink-compliance.vercel.app'
-    const invite_url = `${baseUrl}/invite/${inv.token}`
-    const nombre_empresa = inv.nombre_empresa || ''
+    let inv_email = email
+    let invite_url = directUrl
+    let nombre_empresa = directNombre || ''
+
+    if (invitation_id) {
+      const { data: inv } = await supabaseAdmin.from('invitations').select('*').eq('id', invitation_id).single()
+      if (!inv) return NextResponse.json({ error: 'Invitación no encontrada' }, { status: 404 })
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://crowdlink-compliance.vercel.app'
+      invite_url = `${baseUrl}/invite/${inv.token}`
+      inv_email = inv.email
+      nombre_empresa = inv.nombre_empresa || ''
+    }
+
+    if (!inv_email || !invite_url) {
+      return NextResponse.json({ error: 'Faltan datos para enviar el email' }, { status: 400 })
+    }
 
     if (!process.env.RESEND_API_KEY) {
       return NextResponse.json({ error: 'Resend no configurado' }, { status: 500 })
@@ -36,7 +48,7 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
-        to: [inv.email],
+        to: [inv_email],
         subject: `${nombre_empresa ? nombre_empresa + ' — ' : ''}Invitación KYC Crowdlink`,
         html: buildEmailHTML({ nombre_empresa, invite_url }),
       }),

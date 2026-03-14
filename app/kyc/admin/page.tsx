@@ -152,16 +152,37 @@ export default function KycAdminPage() {
     setInvCreating(false)
   }
 
+  const [invEmailSending, setInvEmailSending] = useState(false)
+
   const sendInvEmail = async (inv: Invitation) => {
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token || sessionToken
-    const res = await fetch('/api/v1/invitations/send-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ invitation_id: inv.id }),
-    })
-    if (res.ok) { setInvEmailSent(true); setTimeout(() => setInvEmailSent(false), 3000) }
+    setInvEmailSending(true)
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token || sessionToken
+      const res = await fetch('/api/v1/invitations/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ 
+          invitation_id: inv.id,
+          email: inv.email,
+          invite_url: inv.invite_url,
+          nombre_empresa: inv.nombre_empresa,
+        }),
+      })
+      if (res.ok) {
+        setInvEmailSent(true)
+        setTimeout(() => {
+          setShowInvModal(false)
+          setInvJustCreated(null)
+          setInvEmailSent(false)
+        }, 1500)
+      } else {
+        const data = await res.json()
+        setInvError(data.error || 'Error al enviar email')
+      }
+    } catch { setInvError('Error de conexión') }
+    setInvEmailSending(false)
   }
 
   const copyInvLink = async (url: string) => {
@@ -579,8 +600,8 @@ export default function KycAdminPage() {
                     <button onClick={() => copyInvLink(invJustCreated.invite_url || '')} style={{ background: invCopied ? '#ECFDF5' : 'white', border: `1.5px solid ${invCopied ? '#6EE7B7' : '#E2E8F0'}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.8rem', fontWeight: '600', color: invCopied ? '#065F46' : '#374151', cursor: 'pointer', fontFamily: font }}>
                       {invCopied ? '¡Copiado!' : 'Copiar link'}
                     </button>
-                    <button onClick={() => sendInvEmail(invJustCreated)} style={{ background: '#0F7BF4', border: 'none', borderRadius: '8px', padding: '0.6rem', fontSize: '0.8rem', fontWeight: '600', color: 'white', cursor: 'pointer', fontFamily: font }}>
-                      Enviar email
+                    <button onClick={() => sendInvEmail(invJustCreated)} disabled={invEmailSending || invEmailSent} style={{ background: invEmailSent ? '#059669' : invEmailSending ? '#6BA8F5' : '#0F7BF4', border: 'none', borderRadius: '8px', padding: '0.6rem', fontSize: '0.8rem', fontWeight: '600', color: 'white', cursor: invEmailSending || invEmailSent ? 'not-allowed' : 'pointer', fontFamily: font }}>
+                      {invEmailSent ? '✓ Enviado' : invEmailSending ? 'Enviando...' : 'Enviar email'}
                     </button>
                     <button onClick={() => { setInvQrModal(invJustCreated); setShowInvModal(false) }} style={{ background: '#EBF3FF', border: '1.5px solid #BFDBFE', borderRadius: '8px', padding: '0.6rem', fontSize: '0.8rem', fontWeight: '600', color: '#0F7BF4', cursor: 'pointer', fontFamily: font }}>
                       Ver QR
