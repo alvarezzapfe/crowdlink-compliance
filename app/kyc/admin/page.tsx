@@ -497,7 +497,7 @@ export default function KycAdminPage() {
                               Integración pendiente
                             </div>
                         }
-                        {selected.metadata?.ekatena_rfc && (
+                        {(selected.metadata?.ekatena_rfc as string) && (
                           <div style={{ color: cl.gray400, fontSize: '0.72rem', marginTop: '0.5rem', fontFamily: 'monospace' }}>
                             RFC consultado: {selected.metadata.ekatena_rfc as string}
                           </div>
