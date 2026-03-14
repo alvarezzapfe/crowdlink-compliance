@@ -6,9 +6,6 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// ─── TOTP puro sin dependencias ────────────────────────────────────────────────
-// RFC 6238 — TOTP = HOTP con counter = floor(unix_time / 30)
-
 function base32Decode(s: string): Uint8Array {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
   const str = s.toUpperCase().replace(/=+$/, '')
@@ -31,7 +28,6 @@ async function hotp(secret: string, counter: number): Promise<string> {
   )
   const buf = new ArrayBuffer(8)
   const view = new DataView(buf)
-  // Write counter as big-endian uint64
   view.setUint32(0, Math.floor(counter / 0x100000000), false)
   view.setUint32(4, counter >>> 0, false)
   const sig = await crypto.subtle.sign('HMAC', key, buf)
@@ -48,7 +44,6 @@ async function hotp(secret: string, counter: number): Promise<string> {
 
 async function verifyTotp(secret: string, code: string): Promise<boolean> {
   const counter = Math.floor(Date.now() / 1000 / 30)
-  // Ventana de ±1 step (90 segundos) para tolerancia de reloj
   for (const delta of [-1, 0, 1]) {
     const expected = await hotp(secret, counter + delta)
     if (expected === code) return true
@@ -56,22 +51,11 @@ async function verifyTotp(secret: string, code: string): Promise<boolean> {
   return false
 }
 
-function extractSessionToken(cookieHeader: string): string | null {
-  const matches = cookieHeader.match(/sb-[^=]+-auth-token=([^;]+)/)
-  if (!matches) return null
-  try {
-    const decoded = decodeURIComponent(matches[1])
-    const parsed = JSON.parse(decoded)
-    return parsed.access_token || null
-  } catch { return null }
-}
-
-// ─── POST ──────────────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
-    const cookieHeader = req.headers.get('cookie') || ''
-    const authToken = extractSessionToken(cookieHeader)
-    if (!authToken) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    const authToken = authHeader.replace('Bearer ', '')
 
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(authToken)
     if (error || !user) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
@@ -80,38 +64,23 @@ export async function POST(req: NextRequest) {
     const code = (body.code || '').trim()
     const isSetup = body.setup === true
 
-    // Validar formato
     if (!/^\d{6}$/.test(code)) {
-      return NextResponse.json({ error: 'Código inválido — debe ser 6 dígitos' }, { status: 400 })
+      return NextResponse.json({ error: 'Código inválido' }, { status: 400 })
     }
 
     if (isSetup) {
-      // En setup, el secret viene en el body (recién generado)
       const secret = (body.secret || '').trim()
       if (!secret) return NextResponse.json({ error: 'Secret requerido' }, { status: 400 })
-
       const valid = await verifyTotp(secret, code)
-      if (!valid) return NextResponse.json({ error: 'Código incorrecto. Verifica la hora de tu dispositivo.' }, { status: 400 })
-
-      // Marcar como verified
+      if (!valid) return NextResponse.json({ error: 'Código incorrecto' }, { status: 400 })
       await supabaseAdmin.from('admin_totp').update({ verified: true }).eq('user_id', user.id)
       return NextResponse.json({ ok: true })
-
     } else {
-      // Verificación normal — leer secret de BD
       const { data: totp } = await supabaseAdmin
-        .from('admin_totp')
-        .select('secret, verified')
-        .eq('user_id', user.id)
-        .single()
-
-      if (!totp || !totp.verified) {
-        return NextResponse.json({ error: '2FA no configurado' }, { status: 400 })
-      }
-
+        .from('admin_totp').select('secret, verified').eq('user_id', user.id).single()
+      if (!totp || !totp.verified) return NextResponse.json({ error: '2FA no configurado' }, { status: 400 })
       const valid = await verifyTotp(totp.secret, code)
       if (!valid) return NextResponse.json({ error: 'Código incorrecto o expirado' }, { status: 400 })
-
       return NextResponse.json({ ok: true })
     }
   } catch (e) {

@@ -36,16 +36,22 @@ export default function AdminLoginPage() {
     const supabase = createClient()
     const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
     if (authError || !data.user) { setError('Credenciales incorrectas'); setLoading(false); return }
-    const accessToken = data.session?.access_token
-    if (!accessToken) { await supabase.auth.signOut(); setError('Error de sesion'); setLoading(false); return }
-    const roleRes = await fetch('/api/v1/auth/check-admin', {
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
+    if (profile?.role !== 'admin') {
+      await supabase.auth.signOut()
+      setError('Acceso denegado — solo administradores'); setLoading(false); return
+    }
+    // Check TOTP status via server endpoint
+    const totpCheckRes = await fetch('/api/v1/totp/status', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+      headers: { 'Authorization': 'Bearer ' + accessToken },
     })
-    if (!roleRes.ok) { await supabase.auth.signOut(); setError('Acceso denegado'); setLoading(false); return }
-    const { data: totp } = await supabase.from('admin_totp').select('verified').eq('user_id', data.user.id).single()
-    if (!totp || !totp.verified) {
-      const res = await fetch('/api/v1/totp/setup', { method: 'POST' })
+    const totpStatus = await totpCheckRes.json()
+    if (!totpStatus.verified) {
+    const res = await fetch('/api/v1/totp/setup', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + accessToken }
+    })
       const setupData = await res.json()
       setTotpSecret(setupData.secret); setTotpQr(setupData.qr_url)
       setStep('totp_setup')
@@ -58,8 +64,11 @@ export default function AdminLoginPage() {
   const handleTotpSetup = async () => {
     if (totpCode.length !== 6) return
     setLoading(true); setError('')
+    const supabase2 = createClient()
+    const { data: { session: s2 } } = await supabase2.auth.getSession()
     const res = await fetch('/api/v1/totp/verify', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (s2?.access_token || '') },
       body: JSON.stringify({ code: totpCode, secret: totpSecret, setup: true }),
     })
     const data = await res.json()
@@ -70,8 +79,11 @@ export default function AdminLoginPage() {
   const handleTotpVerify = async () => {
     if (totpCode.length !== 6) return
     setLoading(true); setError('')
+    const supabase3 = createClient()
+    const { data: { session: s3 } } = await supabase3.auth.getSession()
     const res = await fetch('/api/v1/totp/verify', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (s3?.access_token || '') },
       body: JSON.stringify({ code: totpCode, setup: false }),
     })
     const data = await res.json()
