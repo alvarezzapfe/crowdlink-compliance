@@ -16,6 +16,19 @@ export default function AdminLoginPage() {
   const [totpQr, setTotpQr] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [forgotSent, setForgotSent] = useState(false)
+  const [forgotLoading, setForgotLoading] = useState(false)
+
+  const handleForgot = async () => {
+    if (!email) { setError('Ingresa tu email primero'); return }
+    setForgotLoading(true)
+    const supabase = createClient()
+    await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    setForgotSent(true)
+    setForgotLoading(false)
+  }
 
   const handleCredentials = async () => {
     if (!email || !password) return
@@ -123,6 +136,15 @@ export default function AdminLoginPage() {
                 <button onClick={handleCredentials} disabled={loading || !email || !password} style={btn(loading || !email || !password)}>
                   {loading ? 'Verificando...' : 'Continuar →'}
                 </button>
+                {forgotSent ? (
+                  <div style={{ background: '#ECFDF5', border: '1px solid #BBF7D0', borderRadius: '8px', padding: '0.7rem', textAlign: 'center', color: '#065F46', fontSize: '0.8rem', fontWeight: '500' }}>
+                    Revisa tu correo para restablecer tu contraseña
+                  </div>
+                ) : (
+                  <button onClick={handleForgot} disabled={forgotLoading} style={{ background: 'none', border: 'none', color: cl.gray400, fontSize: '0.8rem', cursor: 'pointer', fontFamily: cl.fontFamily, textAlign: 'center' as const, padding: '0.25rem', textDecoration: 'underline' }}>
+                    {forgotLoading ? 'Enviando...' : 'Olvidé mi contraseña'}
+                  </button>
+                )}
               </div>
             )}
 

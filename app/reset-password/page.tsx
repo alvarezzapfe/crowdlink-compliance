@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import { cl } from '@/lib/design'
 import { IconLock, IconEye, IconEyeOff, IconCheck } from '@/components/Icons'
@@ -11,6 +11,23 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
+  const [sessionReady, setSessionReady] = useState(false)
+
+  useEffect(() => {
+    // Supabase puts the token in the URL hash — need to let it process
+    const supabase = createClient()
+    // Listen for the session to be established from the hash
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || session) {
+        setSessionReady(true)
+      }
+    })
+    // Also try to get existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setSessionReady(true)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   const handleReset = async () => {
     setError('')
@@ -24,6 +41,9 @@ export default function ResetPasswordPage() {
     setLoading(false)
     setTimeout(() => { window.location.href = '/login' }, 2000)
   }
+
+  const strength = password.length === 0 ? 0 : password.length < 8 ? 1 : password.length < 12 ? 2 : password.match(/[A-Z]/) && password.match(/[0-9]/) ? 4 : 3
+  const strengthColor = ['#E2E8F0', '#EF4444', '#F59E0B', '#3B82F6', '#10B981'][strength]
 
   return (
     <div style={{ minHeight: '100vh', background: cl.gray50, fontFamily: cl.fontFamily, display: 'flex', flexDirection: 'column' }}>
@@ -56,10 +76,15 @@ export default function ResetPasswordPage() {
                     </button>
                   </div>
                   {password.length > 0 && (
-                    <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.3rem' }}>
-                      {[1,2,3,4].map(i => (
-                        <div key={i} style={{ flex: 1, height: '3px', borderRadius: '9999px', background: password.length >= i * 2 ? (password.length >= 12 ? '#10B981' : '#F59E0B') : cl.gray200 }} />
-                      ))}
+                    <div style={{ marginTop: '0.4rem' }}>
+                      <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '0.25rem' }}>
+                        {[1,2,3,4].map(i => (
+                          <div key={i} style={{ flex: 1, height: '3px', borderRadius: '9999px', background: i <= strength ? strengthColor : cl.gray200, transition: 'background 0.2s' }} />
+                        ))}
+                      </div>
+                      <div style={{ color: strengthColor, fontSize: '0.7rem', fontWeight: '600' }}>
+                        {['', 'Muy débil', 'Débil', 'Buena', 'Fuerte'][strength]}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -70,11 +95,20 @@ export default function ResetPasswordPage() {
                     onKeyDown={e => e.key === 'Enter' && handleReset()}
                     placeholder="Repite la contraseña"
                     style={{ ...inp, borderColor: confirm && confirm !== password ? '#FCA5A5' : undefined }} />
+                  {confirm && confirm !== password && (
+                    <div style={{ color: '#DC2626', fontSize: '0.72rem', marginTop: '0.25rem' }}>No coinciden</div>
+                  )}
                 </div>
                 {error && (
                   <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '8px', padding: '0.7rem 0.9rem', color: '#DC2626', fontSize: '0.8rem' }}>{error}</div>
                 )}
-                <button onClick={handleReset} disabled={loading || !password || !confirm} style={{ width: '100%', background: loading || !password || !confirm ? '#E2E8F0' : '#0F7BF4', border: 'none', borderRadius: '10px', padding: '0.85rem', color: loading || !password || !confirm ? '#94A3B8' : 'white', cursor: loading || !password || !confirm ? 'not-allowed' : 'pointer', fontFamily: cl.fontFamily, fontSize: '0.9rem', fontWeight: '700', boxShadow: !loading && password && confirm ? '0 4px 12px rgba(15,123,244,0.25)' : 'none' }}>
+                {!sessionReady && (
+                  <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '8px', padding: '0.7rem 0.9rem', color: '#92400E', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ width: '14px', height: '14px', border: '2px solid #FDE68A', borderTopColor: '#F59E0B', borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
+                    Verificando sesión...
+                  </div>
+                )}
+                <button onClick={handleReset} disabled={loading || !password || !confirm || password !== confirm || !sessionReady} style={{ width: '100%', background: loading || !password || !confirm || password !== confirm || !sessionReady ? '#E2E8F0' : '#0F7BF4', border: 'none', borderRadius: '10px', padding: '0.85rem', color: loading || !password || !confirm || password !== confirm || !sessionReady ? '#94A3B8' : 'white', cursor: loading || !password || !confirm || password !== confirm || !sessionReady ? 'not-allowed' : 'pointer', fontFamily: cl.fontFamily, fontSize: '0.9rem', fontWeight: '700', boxShadow: sessionReady && password && confirm && password === confirm ? '0 4px 12px rgba(15,123,244,0.25)' : 'none', transition: 'all 0.2s' }}>
                   {loading ? 'Guardando...' : 'Guardar contraseña'}
                 </button>
               </div>
@@ -90,10 +124,10 @@ export default function ResetPasswordPage() {
           </div>
         </div>
       </div>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap'); input:focus{border-color:#0F7BF4!important;box-shadow:0 0 0 3px #EBF3FF;outline:none;}`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap'); input:focus{border-color:#0F7BF4!important;box-shadow:0 0 0 3px #EBF3FF;outline:none;} @keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }
 
 const lbl: React.CSSProperties = { color: '#475569', fontSize: '0.8rem', fontWeight: '600', display: 'block', marginBottom: '0.45rem' }
-const inp: React.CSSProperties = { width: '100%', background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '0.8rem 1rem', color: '#1E293B', fontSize: '0.9rem', fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box' as const }
+const inp: React.CSSProperties = { width: '100%', background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '0.8rem 1rem', color: '#1E293B', fontSize: '0.9rem', fontFamily: 'Inter, sans-serif', outline: 'none', boxSizing: 'border-box' as const, transition: 'border-color 0.15s' }
