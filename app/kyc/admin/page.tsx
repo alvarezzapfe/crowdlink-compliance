@@ -144,7 +144,7 @@ export default function KycAdminPage() {
     })
     const data = await res.json()
     if (!res.ok) { setInvError(data.error || 'Error'); setInvCreating(false); return }
-    const inv: Invitation = { ...data.invitation, invite_url: data.invite_url }
+    const inv: Invitation = { ...data.invitation, invite_url: data.invite_url, email_sent: data.email_sent }
     setInvJustCreated(inv)
     setInvitations(prev => [inv, ...prev])
     setInvEmail(''); setInvEmpresa('')
@@ -420,7 +420,7 @@ export default function KycAdminPage() {
                     <DR l="Nombre" v={selected?.rep_legal_nombre || '—'} />
                     <DR l="CURP" v={selected?.rep_legal_curp || '—'} mono />
                   </Section>
-                  {!!(selected?.metadata?.financiero) && (
+                  {selected?.metadata?.financiero && (
                     <Section title="Perfil Financiero">
                       <DR l="Facturación" v={String((selected.metadata.financiero as Record<string,unknown>)?.nivel_facturacion || '—')} />
                       <DR l="Empleados" v={String((selected.metadata.financiero as Record<string,unknown>)?.num_empleados || '—')} />
@@ -551,7 +551,12 @@ export default function KycAdminPage() {
                   <IconCheck size={18} color="#059669" strokeWidth={2.5} />
                   <div>
                     <div style={{ color: '#065F46', fontSize: '0.88rem', fontWeight: '700' }}>Invitación generada</div>
-                    <div style={{ color: '#4B7A60', fontSize: '0.75rem' }}>{invJustCreated.email}</div>
+                    <div style={{ color: '#4B7A60', fontSize: '0.75rem' }}>
+                    {invJustCreated.email}
+                    {(invJustCreated as Invitation & {email_sent?: boolean}).email_sent && 
+                      <span style={{ marginLeft: '0.5rem', background: '#D1FAE5', color: '#065F46', fontSize: '0.65rem', fontWeight: '700', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>Email enviado</span>
+                    }
+                  </div>
                   </div>
                 </div>
                 <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '1rem', marginBottom: '1rem' }}>
