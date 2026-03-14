@@ -56,10 +56,19 @@ export default function KycAdminPage() {
   const [invQrModal, setInvQrModal] = useState<Invitation | null>(null)
   const [sessionToken, setSessionToken] = useState('')
 
-  const loadEmpresas = useCallback(async () => {
+  const loadEmpresas = useCallback(async (token?: string) => {
     const supabase = createClient()
-    const { data } = await supabase.from('kyc_empresas').select('*').order('created_at', { ascending: false })
-    setEmpresas(data || [])
+    const { data: { session } } = await supabase.auth.getSession()
+    const t = token || session?.access_token
+    if (!t) { setLoading(false); return }
+    // Use service role via API to bypass RLS
+    const res = await fetch('/api/v1/kyc/admin/empresas', {
+      headers: { 'Authorization': 'Bearer ' + t }
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setEmpresas(data.empresas || [])
+    }
     setLoading(false)
   }, [])
 
@@ -93,7 +102,7 @@ export default function KycAdminPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.access_token) setSessionToken(session.access_token)
       setAuthChecked(true)
-      await loadEmpresas()
+      await loadEmpresas(session?.access_token)
     }
     load()
   }, [loadEmpresas])
@@ -194,51 +203,42 @@ export default function KycAdminPage() {
   if (!authChecked && !loading) return null
 
   return (
-    <div style={{ height: '100vh', display: 'flex', fontFamily: cl.fontFamily, background: cl.gray50, overflow: 'hidden' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: cl.fontFamily, background: cl.gray50, overflow: 'hidden' }}>
 
-      {/* SIDEBAR */}
-      <div style={{ width: '64px', flexShrink: 0, background: '#0B1120', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '0', borderRight: `1px solid rgba(255,255,255,0.06)` }}>
-        {/* Logo area */}
-        <div style={{ width: '100%', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg,#0F7BF4,#3DFFA0)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M9 2C5.13 2 2 5.13 2 9s3.13 7 7 7 7-3.13 7-7-3.13-7-7-7z" fill="white" opacity="0.3"/>
-              <path d="M9 4C6.24 4 4 6.24 4 9s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5z" stroke="white" strokeWidth="1.5" fill="none"/>
-            </svg>
+      {/* TOP NAV */}
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: '56px', background: cl.white, borderBottom: `1px solid ${cl.gray200}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 1.5rem', zIndex: 100, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <a href="/gate" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: cl.gray500, textDecoration: 'none', fontSize: '0.82rem', fontWeight: '500', background: cl.gray100, border: `1px solid ${cl.gray200}`, borderRadius: '8px', padding: '0.35rem 0.75rem' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15,18 9,12 15,6"/></svg>
+            Módulos
+          </a>
+          <div style={{ width: '1px', height: '18px', background: cl.gray200 }} />
+          <img src="/crowdlink-logo.png" alt="Crowdlink" style={{ height: '20px', width: 'auto' }} />
+          <div style={{ width: '1px', height: '18px', background: cl.gray200 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <IconBuilding size={15} color="#0F7BF4" />
+            <span style={{ color: cl.gray700, fontSize: '0.82rem', fontWeight: '700' }}>KYC Admin</span>
           </div>
         </div>
-        {/* Nav icons */}
-        {[
-          { icon: <IconBuilding size={20} />, active: true, tip: 'KYC Empresas' },
-        ].map((item, i) => (
-          <div key={i} title={item.tip} style={{
-            width: '44px', height: '44px', borderRadius: '10px', margin: '0.5rem 0',
-            background: item.active ? 'rgba(15,123,244,0.2)' : 'transparent',
-            border: item.active ? '1px solid rgba(15,123,244,0.4)' : '1px solid transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: item.active ? '#0F7BF4' : 'rgba(255,255,255,0.3)',
-            cursor: 'pointer', transition: 'all 0.15s',
-          }}>
-            {item.icon}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ background: cl.gray50, border: `1px solid ${cl.gray200}`, borderRadius: '9999px', padding: '0.25rem 0.75rem 0.25rem 0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'linear-gradient(135deg,#0F7BF4,#3DFFA0)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.62rem', fontWeight: '700' }}>
+              {userEmail?.[0]?.toUpperCase() || 'A'}
+            </div>
+            <span style={{ color: cl.gray600, fontSize: '0.75rem', fontWeight: '500' }}>{userEmail}</span>
           </div>
-        ))}
-        {/* Bottom */}
-        <div style={{ marginTop: 'auto', paddingBottom: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-          <a href="/gate" title="Módulos" style={{
-            width: '44px', height: '44px', borderRadius: '10px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'rgba(255,255,255,0.25)', textDecoration: 'none',
-          }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-              <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-            </svg>
-          </a>
+          <button onClick={async () => { const { createClient } = await import('@/lib/supabase-client'); const s = createClient(); await s.auth.signOut(); window.location.href = '/login'; }} style={{ background: 'transparent', border: `1px solid ${cl.gray200}`, borderRadius: '8px', padding: '0.35rem 0.75rem', color: cl.gray500, fontSize: '0.78rem', cursor: 'pointer', fontFamily: cl.fontFamily, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Salir
+          </button>
         </div>
       </div>
 
+      {/* MAIN CONTENT - below nav */}
+      <div style={{ display: 'flex', flex: 1, marginTop: '56px', overflow: 'hidden' }}>
+
       {/* LIST PANEL */}
-      <div style={{ width: '320px', flexShrink: 0, background: cl.white, borderRight: `1px solid ${cl.gray200}`, display: 'flex', flexDirection: 'column', height: '100vh' }}>
+      <div style={{ width: '320px', flexShrink: 0, background: cl.white, borderRight: `1px solid ${cl.gray200}`, display: 'flex', flexDirection: 'column', height: '100%' }}>
 
         {/* Header */}
         <div style={{ padding: '0 1.25rem', borderBottom: `1px solid ${cl.gray100}`, height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxSizing: 'border-box' as const }}>
@@ -497,7 +497,7 @@ export default function KycAdminPage() {
                               Integración pendiente
                             </div>
                         }
-                        {(selected.metadata?.ekatena_rfc as string) && (
+                        {selected.metadata?.ekatena_rfc && (
                           <div style={{ color: cl.gray400, fontSize: '0.72rem', marginTop: '0.5rem', fontFamily: 'monospace' }}>
                             RFC consultado: {selected.metadata.ekatena_rfc as string}
                           </div>
@@ -678,6 +678,8 @@ export default function KycAdminPage() {
           </>
         )}
       </div>
+
+      </div>{/* end MAIN CONTENT */}
 
       {/* QR Modal */}
       {invQrModal && (
