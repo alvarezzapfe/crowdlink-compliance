@@ -55,6 +55,8 @@ export default function KycAdminPage() {
   const [invCopied, setInvCopied] = useState(false)
   const [invQrModal, setInvQrModal] = useState<Invitation | null>(null)
   const [sessionToken, setSessionToken] = useState('')
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
 
   const loadEmpresas = useCallback(async (token?: string) => {
     const supabase = createClient()
@@ -503,9 +505,9 @@ export default function KycAdminPage() {
                               Integración pendiente
                             </div>
                         }
-                        {!!(selected.metadata?.ekatena_rfc) && (
+                        {selected.metadata?.ekatena_rfc && (
                           <div style={{ color: cl.gray400, fontSize: '0.72rem', marginTop: '0.5rem', fontFamily: 'monospace' }}>
-                            RFC consultado: {String(selected.metadata?.ekatena_rfc ?? "")}
+                            RFC consultado: {selected.metadata.ekatena_rfc as string}
                           </div>
                         )}
                       </div>
@@ -688,7 +690,7 @@ export default function KycAdminPage() {
       </div>{/* end MAIN CONTENT */}
 
       {/* QR Modal */}
-      {invQrModal && (
+      {mounted && invQrModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setInvQrModal(null)}>
           <div style={{ background: cl.white, borderRadius: '18px', padding: '2rem', width: '100%', maxWidth: '380px', boxShadow: '0 24px 48px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
