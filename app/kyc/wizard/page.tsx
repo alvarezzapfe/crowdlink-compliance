@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
 import { cl } from '@/lib/design'
 import { IconCheck, IconZap, IconDoc, IconUser, IconBuilding, IconCreditCard, IconEye, IconEyeOff, IconLock, IconInfo, IconX } from '@/components/Icons'
@@ -45,10 +46,8 @@ const FUENTE_OPTS = [
 ]
 
 export default function KycWizardPage() {
-  const [locked, setLocked] = useState(false)
-  useEffect(() => {
-    setLocked(new URLSearchParams(window.location.search).get('locked') === '1')
-  }, [])
+  const searchParams = useSearchParams()
+  const locked = searchParams.get('locked') === '1'
   const [step, setStep] = useState(1)
   const [form, setForm] = useState<Form>({
     razon_social: '', rfc: '', tipo_persona: 'moral', giro: '', pais: 'MX',
@@ -195,9 +194,11 @@ export default function KycWizardPage() {
             </div>
           )}
           <div style={{ color: cl.gray400, fontSize: '0.73rem', fontFamily: 'monospace', marginBottom: '2rem' }}>ID: {submitted}</div>
-          <a href="/gate" style={{ background: '#0F7BF4', color: 'white', textDecoration: 'none', padding: '0.75rem 2rem', borderRadius: '10px', fontSize: '0.9rem', fontWeight: '700', display: 'inline-block' }}>
-            Volver al inicio
-          </a>
+          {!locked && (
+            <a href="/gate" style={{ background: '#0F7BF4', color: 'white', textDecoration: 'none', padding: '0.75rem 2rem', borderRadius: '10px', fontSize: '0.9rem', fontWeight: '700', display: 'inline-block' }}>
+              Volver al inicio
+            </a>
+          )}
         </div>
       </div>
       <style>{fontImport}</style>
