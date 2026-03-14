@@ -6,7 +6,6 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// Next.js 16: params is a Promise
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
