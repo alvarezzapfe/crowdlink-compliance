@@ -6,11 +6,23 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-function generateBase32Secret(length = 20): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
-  const bytes = new Uint8Array(length)
+function generateBase32Secret(): string {
+  // Generate 20 random bytes and encode as base32
+  const bytes = new Uint8Array(20)
   crypto.getRandomValues(bytes)
-  return Array.from(bytes).map(b => chars[b % 32]).join('')
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+  let result = ''
+  let buffer = 0
+  let bitsLeft = 0
+  for (const byte of bytes) {
+    buffer = (buffer << 8) | byte
+    bitsLeft += 8
+    while (bitsLeft >= 5) {
+      bitsLeft -= 5
+      result += chars[(buffer >> bitsLeft) & 31]
+    }
+  }
+  return result
 }
 
 export async function POST(req: NextRequest) {
