@@ -10,6 +10,11 @@ export default function GatePage() {
 
   useEffect(() => {
     const load = async () => {
+      // Handle password reset redirect from Supabase
+      if (window.location.hash.includes('type=recovery')) {
+        window.location.href = '/reset-password' + window.location.hash
+        return
+      }
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return // sin sesión — mostrar gate igual, sin redirigir
