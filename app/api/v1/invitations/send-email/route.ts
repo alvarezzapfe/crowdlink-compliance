@@ -56,12 +56,14 @@ export async function POST(req: NextRequest) {
 
     if (!emailRes.ok) {
       const err = await emailRes.json()
-      return NextResponse.json({ error: err.message || 'Error enviando email' }, { status: 500 })
+      console.error('Resend error:', err)
+      return NextResponse.json({ error: err.message || 'Error enviando email', resend: err }, { status: 500 })
     }
 
     return NextResponse.json({ ok: true })
   } catch (e) {
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+    console.error('send-email error:', e)
+    return NextResponse.json({ error: 'Error interno', detail: String(e) }, { status: 500 })
   }
 }
 
