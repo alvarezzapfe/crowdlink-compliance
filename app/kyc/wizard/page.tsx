@@ -1,6 +1,5 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
 import { cl } from '@/lib/design'
 import { IconCheck, IconZap, IconDoc, IconUser, IconBuilding, IconCreditCard, IconEye, IconEyeOff, IconLock, IconInfo, IconX } from '@/components/Icons'
@@ -46,8 +45,10 @@ const FUENTE_OPTS = [
 ]
 
 export default function KycWizardPage() {
-  const searchParams = useSearchParams()
-  const locked = searchParams.get('locked') === '1'
+  const [locked, setLocked] = useState(false)
+  useEffect(() => {
+    setLocked(new URLSearchParams(window.location.search).get('locked') === '1')
+  }, [])
   const [step, setStep] = useState(1)
   const [form, setForm] = useState<Form>({
     razon_social: '', rfc: '', tipo_persona: 'moral', giro: '', pais: 'MX',
