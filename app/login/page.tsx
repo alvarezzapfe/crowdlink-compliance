@@ -36,11 +36,13 @@ export default function AdminLoginPage() {
     const supabase = createClient()
     const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
     if (authError || !data.user) { setError('Credenciales incorrectas'); setLoading(false); return }
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
-    if (profile?.role !== 'admin') {
-      await supabase.auth.signOut()
-      setError('Acceso denegado — solo administradores'); setLoading(false); return
-    }
+    const accessToken = data.session?.access_token
+    if (!accessToken) { await supabase.auth.signOut(); setError('Error de sesion'); setLoading(false); return }
+    const roleRes = await fetch('/api/v1/auth/check-admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+    })
+    if (!roleRes.ok) { await supabase.auth.signOut(); setError('Acceso denegado'); setLoading(false); return }
     const { data: totp } = await supabase.from('admin_totp').select('verified').eq('user_id', data.user.id).single()
     if (!totp || !totp.verified) {
       const res = await fetch('/api/v1/totp/setup', { method: 'POST' })
