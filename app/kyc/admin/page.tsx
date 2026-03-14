@@ -159,10 +159,13 @@ export default function KycAdminPage() {
 
   // ─── Invitaciones helpers ─────────────────────────────────────────────────
   const loadInvitations = async () => {
-    if (!sessionToken) return
     setInvLoading(true)
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token || sessionToken
+    if (!token) { setInvLoading(false); return }
     const res = await fetch('/api/v1/invitations', {
-      headers: { 'Authorization': `Bearer ${sessionToken}` }
+      headers: { 'Authorization': `Bearer ${token}` }
     })
     const data = await res.json()
     const base = window.location.origin
@@ -175,9 +178,12 @@ export default function KycAdminPage() {
   const handleCreateInv = async () => {
     if (!invEmail.trim()) { setInvError('Email requerido'); return }
     setInvCreating(true); setInvError(''); setInvJustCreated(null)
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token || sessionToken
     const res = await fetch('/api/v1/invitations', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionToken}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({ email: invEmail.trim().toLowerCase(), nombre_empresa: invEmpresa.trim() }),
     })
     const data = await res.json()
@@ -497,9 +503,9 @@ export default function KycAdminPage() {
                               Integración pendiente
                             </div>
                         }
-                        {!!(selected.metadata?.ekatena_rfc) && (
+                        {selected.metadata?.ekatena_rfc && (
                           <div style={{ color: cl.gray400, fontSize: '0.72rem', marginTop: '0.5rem', fontFamily: 'monospace' }}>
-                            RFC consultado: {String(selected.metadata.ekatena_rfc || "")}
+                            RFC consultado: {selected.metadata.ekatena_rfc as string}
                           </div>
                         )}
                       </div>

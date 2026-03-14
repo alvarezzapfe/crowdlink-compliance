@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
 import { cl } from '@/lib/design'
 import { IconCheck, IconZap, IconDoc, IconUser, IconBuilding, IconCreditCard, IconEye, IconEyeOff, IconLock, IconInfo, IconX } from '@/components/Icons'
@@ -45,6 +46,8 @@ const FUENTE_OPTS = [
 ]
 
 export default function KycWizardPage() {
+  const searchParams = useSearchParams()
+  const locked = searchParams.get('locked') === '1'
   const [step, setStep] = useState(1)
   const [form, setForm] = useState<Form>({
     razon_social: '', rfc: '', tipo_persona: 'moral', giro: '', pais: 'MX',
@@ -169,7 +172,7 @@ export default function KycWizardPage() {
   // ─── Success ────────────────────────────────────────────────────────────────
   if (step === 7) return (
     <div style={rootStyle}>
-      <TopBar back="/kyc/inicio" title="Onboarding" />
+      <TopBar back="/kyc/inicio" title="Onboarding" locked={locked} />
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
         <div style={{ background: cl.white, border: `1px solid ${cl.gray200}`, borderRadius: '20px', padding: '3rem', maxWidth: '440px', width: '100%', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.08)' }}>
           <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#ECFDF5', border: '2px solid #6EE7B7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
@@ -204,7 +207,7 @@ export default function KycWizardPage() {
 
   return (
     <div style={{ ...rootStyle, overflow: 'hidden' }}>
-      <TopBar back="/kyc/inicio" title="Onboarding Empresa" />
+      <TopBar back="/kyc/inicio" title="Onboarding Empresa" locked={locked} />
 
       {/* Progress bar */}
       <div style={{ background: cl.white, borderBottom: `1px solid ${cl.gray200}`, padding: '0 2rem', height: '72px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
@@ -583,14 +586,18 @@ function DocUpload({ label, doc, onFile, onRemove }: {
   )
 }
 
-function TopBar({ back, title }: { back: string; title: string }) {
+function TopBar({ back, title, locked }: { back: string; title: string; locked?: boolean }) {
   return (
     <div style={{ background: cl.white, borderBottom: `1px solid ${cl.gray200}`, padding: '0 2rem', height: '52px', display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0 }}>
-      <a href={back} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none', color: cl.gray500, fontSize: '0.82rem', fontWeight: '500' }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15,18 9,12 15,6"/></svg>
-        Regresar
-      </a>
-      <div style={{ width: '1px', height: '18px', background: cl.gray200 }} />
+      {!locked ? (
+        <>
+          <a href={back} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none', color: cl.gray500, fontSize: '0.82rem', fontWeight: '500' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15,18 9,12 15,6"/></svg>
+            Regresar
+          </a>
+          <div style={{ width: '1px', height: '18px', background: cl.gray200 }} />
+        </>
+      ) : null}
       <img src="/crowdlink-logo.png" alt="Crowdlink" style={{ height: '20px', width: 'auto' }} />
       <div style={{ width: '1px', height: '18px', background: cl.gray200 }} />
       <span style={{ color: cl.gray500, fontSize: '0.82rem', fontWeight: '500' }}>{title}</span>
