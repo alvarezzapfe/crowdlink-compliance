@@ -39,7 +39,7 @@ export default function AdminLoginPage() {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
     if (profile?.role !== 'admin') {
       await supabase.auth.signOut()
-      setError('Acceso denegado — solo administradores'); setLoading(false); return
+      setError('Acceso denegado — ' + (await roleRes.json()).error); setLoading(false); return
     }
     const { data: totp } = await supabase.from('admin_totp').select('verified').eq('user_id', data.user.id).single()
     if (!totp || !totp.verified) {
