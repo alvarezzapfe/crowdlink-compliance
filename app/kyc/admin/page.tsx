@@ -54,6 +54,7 @@ export default function KycAdminPage() {
   const [invJustCreated, setInvJustCreated] = useState<Invitation | null>(null)
   const [invCopied, setInvCopied] = useState(false)
   const [invQrModal, setInvQrModal] = useState<Invitation | null>(null)
+  const [showInvModal, setShowInvModal] = useState(false)
   const [sessionToken, setSessionToken] = useState('')
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
@@ -256,7 +257,7 @@ export default function KycAdminPage() {
             <span style={{ color: cl.gray500, fontSize: '0.75rem', fontWeight: '700' }}>KYC Admin</span>
           </div>
           <button
-            onClick={() => { setSelected(null); setActiveTab('invitaciones'); loadInvitations() }}
+            onClick={() => { setShowInvModal(true); loadInvitations() }}
             title="Invitaciones"
             style={{ background: '#EBF3FF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '0.35rem 0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#0F7BF4', fontSize: '0.72rem', fontWeight: '700', fontFamily: cl.fontFamily }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -372,7 +373,7 @@ export default function KycAdminPage() {
 
       {/* DETAIL PANEL */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-        {!selected ? (
+        {(!selected && activeTab !== 'invitaciones') ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '1rem', background: cl.gray50 }}>
             <div style={{ width: '64px', height: '64px', borderRadius: '16px', background: cl.gray100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <IconBuilding size={28} color={cl.gray300} />
@@ -505,9 +506,9 @@ export default function KycAdminPage() {
                               Integración pendiente
                             </div>
                         }
-                        {!!(selected.metadata as Record<string,unknown>)?.ekatena_rfc && (
+                        {selected.metadata?.ekatena_rfc && (
                           <div style={{ color: cl.gray400, fontSize: '0.72rem', marginTop: '0.5rem', fontFamily: 'monospace' }}>
-                            RFC consultado: {String((selected.metadata as Record<string,unknown>)?.ekatena_rfc ?? "")}
+                            RFC consultado: {selected.metadata.ekatena_rfc as string}
                           </div>
                         )}
                       </div>
@@ -581,7 +582,7 @@ export default function KycAdminPage() {
                 )}
 
                 {/* ── INVITACIONES TAB ── */}
-                {activeTab === 'invitaciones' && (
+                {(activeTab === 'invitaciones') && (
                   <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: '1rem', alignItems: 'start' }}>
 
                     {/* Formulario nueva invitación */}
@@ -688,6 +689,98 @@ export default function KycAdminPage() {
       </div>
 
       </div>{/* end MAIN CONTENT */}
+
+      {/* Invitations Modal */}
+      {mounted && showInvModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setShowInvModal(false)}>
+          <div style={{ background: cl.white, borderRadius: '18px', padding: '2rem', width: '100%', maxWidth: '560px', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 24px 48px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div>
+                <h2 style={{ color: cl.gray900, fontSize: '1.1rem', fontWeight: '800', margin: '0 0 0.2rem' }}>Invitaciones KYC</h2>
+                <p style={{ color: cl.gray400, fontSize: '0.8rem', margin: 0 }}>Genera links y QRs para que tus clientes completen el KYC</p>
+              </div>
+              <button onClick={() => setShowInvModal(false)} style={{ background: cl.gray100, border: 'none', borderRadius: '8px', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <IconX size={16} color={cl.gray500} />
+              </button>
+            </div>
+
+            {/* Create form */}
+            {!invJustCreated ? (
+              <div style={{ display: 'grid', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div>
+                  <label style={{ color: cl.gray700, fontSize: '0.8rem', fontWeight: '600', display: 'block', marginBottom: '0.4rem' }}>Email del cliente *</label>
+                  <input type="email" value={invEmail} onChange={e => setInvEmail(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleCreateInv()}
+                    placeholder="cliente@empresa.com" autoFocus
+                    style={{ width: '100%', background: cl.gray50, border: `1.5px solid ${cl.gray200}`, borderRadius: '9px', padding: '0.7rem 1rem', color: cl.gray800, fontSize: '0.88rem', fontFamily: cl.fontFamily, outline: 'none', boxSizing: 'border-box' as const }} />
+                </div>
+                <div>
+                  <label style={{ color: cl.gray700, fontSize: '0.8rem', fontWeight: '600', display: 'block', marginBottom: '0.4rem' }}>Empresa (opcional)</label>
+                  <input value={invEmpresa} onChange={e => setInvEmpresa(e.target.value)} placeholder="Empresa SA de CV"
+                    style={{ width: '100%', background: cl.gray50, border: `1.5px solid ${cl.gray200}`, borderRadius: '9px', padding: '0.7rem 1rem', color: cl.gray800, fontSize: '0.88rem', fontFamily: cl.fontFamily, outline: 'none', boxSizing: 'border-box' as const }} />
+                </div>
+                {invError && <div style={{ color: '#DC2626', fontSize: '0.78rem', background: '#FEF2F2', padding: '0.6rem 0.9rem', borderRadius: '8px', border: '1px solid #FECACA' }}>{invError}</div>}
+                <button onClick={handleCreateInv} disabled={invCreating || !invEmail.trim()} style={{ background: invCreating || !invEmail.trim() ? cl.gray200 : '#0F7BF4', color: invCreating || !invEmail.trim() ? cl.gray400 : 'white', border: 'none', borderRadius: '9px', padding: '0.75rem', fontSize: '0.88rem', fontWeight: '700', cursor: invCreating || !invEmail.trim() ? 'not-allowed' : 'pointer', fontFamily: cl.fontFamily }}>
+                  {invCreating ? 'Generando...' : 'Generar invitación'}
+                </button>
+              </div>
+            ) : (
+              <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ background: '#ECFDF5', border: '1.5px solid #6EE7B7', borderRadius: '10px', padding: '1rem', marginBottom: '1rem', display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                  <IconCheck size={18} color="#059669" strokeWidth={2.5} />
+                  <div>
+                    <div style={{ color: '#065F46', fontSize: '0.85rem', fontWeight: '700' }}>Invitación generada</div>
+                    <div style={{ color: '#4B7A60', fontSize: '0.75rem' }}>{invJustCreated.email}</div>
+                  </div>
+                </div>
+                <div style={{ background: cl.gray50, border: `1px solid ${cl.gray200}`, borderRadius: '8px', padding: '0.75rem', marginBottom: '0.75rem' }}>
+                  <div style={{ color: cl.gray400, fontSize: '0.65rem', fontWeight: '700', letterSpacing: '0.08em', marginBottom: '0.35rem' }}>LINK</div>
+                  <div style={{ color: cl.gray600, fontSize: '0.72rem', fontFamily: 'monospace', wordBreak: 'break-all', marginBottom: '0.65rem' }}>{invJustCreated.invite_url}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    <button onClick={() => copyInvLink(invJustCreated.invite_url || '')} style={{ background: invCopied ? '#ECFDF5' : cl.white, border: `1.5px solid ${invCopied ? '#6EE7B7' : cl.gray200}`, borderRadius: '7px', padding: '0.55rem', fontSize: '0.78rem', fontWeight: '700', color: invCopied ? '#065F46' : cl.gray600, cursor: 'pointer', fontFamily: cl.fontFamily }}>
+                      {invCopied ? '¡Copiado!' : 'Copiar link'}
+                    </button>
+                    <button onClick={() => { setInvQrModal(invJustCreated); setShowInvModal(false) }} style={{ background: '#EBF3FF', border: '1.5px solid #BFDBFE', borderRadius: '7px', padding: '0.55rem', fontSize: '0.78rem', fontWeight: '700', color: '#0F7BF4', cursor: 'pointer', fontFamily: cl.fontFamily }}>
+                      Ver QR
+                    </button>
+                  </div>
+                </div>
+                <button onClick={() => setInvJustCreated(null)} style={{ width: '100%', background: cl.gray100, border: `1px solid ${cl.gray200}`, borderRadius: '8px', padding: '0.6rem', fontSize: '0.8rem', fontWeight: '600', color: cl.gray500, cursor: 'pointer', fontFamily: cl.fontFamily }}>
+                  Nueva invitación
+                </button>
+              </div>
+            )}
+
+            {/* Invitations list */}
+            <div style={{ borderTop: `1px solid ${cl.gray100}`, paddingTop: '1rem' }}>
+              <div style={{ color: cl.gray500, fontSize: '0.78rem', fontWeight: '700', marginBottom: '0.75rem' }}>
+                Invitaciones enviadas ({invitations.length})
+              </div>
+              {invLoading ? (
+                <div style={{ textAlign: 'center', padding: '1.5rem', color: cl.gray400, fontSize: '0.82rem' }}>Cargando...</div>
+              ) : invitations.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '1.5rem', color: cl.gray400, fontSize: '0.82rem' }}>Sin invitaciones aún</div>
+              ) : invitations.map(inv => {
+                const st = invStatus(inv)
+                return (
+                  <div key={inv.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.65rem 0', borderBottom: `1px solid ${cl.gray100}` }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: cl.gray800, fontSize: '0.82rem', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inv.email}</div>
+                      <div style={{ color: cl.gray400, fontSize: '0.72rem' }}>{inv.nombre_empresa || '—'} · {new Date(inv.created_at).toLocaleDateString('es-MX')}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0, marginLeft: '0.75rem' }}>
+                      <span style={{ background: st.bg, color: st.color, fontSize: '0.65rem', fontWeight: '700', padding: '0.15rem 0.5rem', borderRadius: '9999px' }}>{st.label}</span>
+                      {!inv.used && new Date(inv.expires_at) > new Date() && (
+                        <button onClick={() => { setInvQrModal(inv); setShowInvModal(false) }} style={{ background: '#EBF3FF', border: '1px solid #BFDBFE', borderRadius: '6px', padding: '0.3rem 0.6rem', fontSize: '0.68rem', fontWeight: '700', color: '#0F7BF4', cursor: 'pointer', fontFamily: cl.fontFamily }}>QR</button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* QR Modal */}
       {mounted && invQrModal && (
