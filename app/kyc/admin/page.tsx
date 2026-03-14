@@ -128,10 +128,10 @@ export default function KycAdminPage() {
     await supabase.from('kyc_empresas').update({
       status, notas: nota, updated_at: new Date().toISOString(),
       metadata: { ...selected.metadata, historial: updatedHist },
-    }).eq('id', selected.id)
+    }).eq('id', selected?.id)
     setHistorial(updatedHist)
     setSelected({ ...selected, status, notas: nota })
-    setEmpresas(prev => prev.map(e => e.id === selected.id ? { ...e, status } : e))
+    setEmpresas(prev => prev.map(e => e.id === selected?.id ? { ...e, status } : e))
     setSaving(false)
   }
 
@@ -139,7 +139,7 @@ export default function KycAdminPage() {
     if (!selected || saving) return
     setSaving(true)
     const supabase = createClient()
-    await supabase.from('kyc_empresas').update({ notas: nota }).eq('id', selected.id)
+    await supabase.from('kyc_empresas').update({ notas: nota }).eq('id', selected?.id)
     setSelected({ ...selected, notas: nota })
     setSaving(false)
   }
@@ -390,27 +390,27 @@ export default function KycAdminPage() {
               padding: '0 1.75rem', flexShrink: 0,
             }}>
               <div>
-                <h2 style={{ color: cl.gray900, fontSize: '1rem', fontWeight: '700', margin: 0, letterSpacing: '-0.01em' }}>{selected.razon_social}</h2>
-                <div style={{ color: cl.gray400, fontSize: '0.73rem', fontFamily: 'monospace', marginTop: '0.1rem' }}>{selected.rfc} · {selected.tipo_persona}</div>
+                <h2 style={{ color: cl.gray900, fontSize: '1rem', fontWeight: '700', margin: 0, letterSpacing: '-0.01em' }}>{selected?.razon_social}</h2>
+                <div style={{ color: cl.gray400, fontSize: '0.73rem', fontFamily: 'monospace', marginTop: '0.1rem' }}>{selected?.rfc} · {selected?.tipo_persona}</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                {(() => { const sc = statusConfig[selected.status]; return (
+                {(() => { const sc = statusConfig[selected?.status || 'pending']; return (
                   <span style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.dot}30`, fontSize: '0.78rem', fontWeight: '700', padding: '0.35rem 0.9rem', borderRadius: '9999px' }}>
                     {sc.label}
                   </span>
                 )})()}
                 {/* Quick actions */}
-                {selected.status !== 'approved' && (
+                {selected?.status !== 'approved' && (
                   <button onClick={() => updateStatus('approved')} disabled={saving} style={{ background: '#ECFDF5', border: '1.5px solid #A7F3D0', color: '#065F46', padding: '0.4rem 0.9rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: '600', fontFamily: cl.fontFamily, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <IconCheck size={14} color="#065F46" /> Aprobar
                   </button>
                 )}
-                {selected.status !== 'rejected' && (
+                {selected?.status !== 'rejected' && (
                   <button onClick={() => updateStatus('rejected')} disabled={saving} style={{ background: '#FEF2F2', border: '1.5px solid #FECACA', color: '#991B1B', padding: '0.4rem 0.9rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: '600', fontFamily: cl.fontFamily, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <IconX size={14} color="#991B1B" /> Rechazar
                   </button>
                 )}
-                {selected.status !== 'in_review' && (
+                {selected?.status !== 'in_review' && (
                   <button onClick={() => updateStatus('in_review')} disabled={saving} style={{ background: '#EFF6FF', border: '1.5px solid #BFDBFE', color: '#1D4ED8', padding: '0.4rem 0.9rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: '600', fontFamily: cl.fontFamily, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <IconClock size={14} color="#1D4ED8" /> En revisión
                   </button>
@@ -450,16 +450,16 @@ export default function KycAdminPage() {
                 {activeTab === 'datos' && (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                     <Card title="Empresa" icon={<IconBuilding size={16} color="#0F7BF4" />}>
-                      <DRow l="Razón Social" v={selected.razon_social} />
-                      <DRow l="RFC" v={selected.rfc} mono />
-                      <DRow l="Tipo Persona" v={selected.tipo_persona === 'moral' ? 'Persona Moral' : 'Persona Física'} />
-                      <DRow l="Giro / Sector" v={selected.giro || '—'} />
-                      <DRow l="País" v={selected.pais} />
-                      <DRow l="Fecha de solicitud" v={new Date(selected.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })} />
+                      <DRow l="Razón Social" v={selected?.razon_social || ""} />
+                      <DRow l="RFC" v={selected?.rfc || ""} mono />
+                      <DRow l="Tipo Persona" v={selected?.tipo_persona === 'moral' ? 'Persona Moral' : selected?.tipo_persona === 'fisica' ? 'Persona Física' : ''} />
+                      <DRow l="Giro / Sector" v={selected?.giro || '—'} />
+                      <DRow l="País" v={selected?.pais || ""} />
+                      <DRow l="Fecha de solicitud" v={selected?.created_at ? new Date(selected.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' }) : ''} />
                     </Card>
                     <Card title="Representante Legal" icon={<IconUser size={16} color="#0F7BF4" />}>
-                      <DRow l="Nombre completo" v={selected.rep_legal_nombre || '—'} />
-                      <DRow l="CURP" v={selected.rep_legal_curp || '—'} mono />
+                      <DRow l="Nombre completo" v={selected?.rep_legal_nombre || '—'} />
+                      <DRow l="CURP" v={selected?.rep_legal_curp || '—'} mono />
                     </Card>
                   </div>
                 )}
@@ -469,9 +469,9 @@ export default function KycAdminPage() {
                   <Card title="Documentos del Expediente" icon={<IconDoc size={16} color="#0F7BF4" />}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1rem', paddingTop: '0.5rem' }}>
                       {[
-                        { label: 'Acta Constitutiva', url: selected.acta_constitutiva_url },
-                        { label: 'Comprobante de Domicilio', url: selected.comprobante_domicilio_url },
-                        { label: 'ID Representante Legal', url: selected.identificacion_rep_url },
+                        { label: 'Acta Constitutiva', url: selected?.acta_constitutiva_url },
+                        { label: 'Comprobante de Domicilio', url: selected?.comprobante_domicilio_url },
+                        { label: 'ID Representante Legal', url: selected?.identificacion_rep_url },
                       ].map(doc => (
                         <div key={doc.label} style={{
                           border: `1.5px solid ${doc.url ? '#3DFFA040' : cl.gray200}`,
@@ -498,7 +498,7 @@ export default function KycAdminPage() {
                     <Card title="Score Ekatena" icon={<IconZap size={16} color="#0F7BF4" />}>
                       <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
                         <div style={{ fontSize: '3rem', fontWeight: '800', color: cl.gray200, letterSpacing: '-0.04em', marginBottom: '0.5rem' }}>—</div>
-                        {(selected.metadata?.ekatena_conectado as boolean)
+                        {!!(selected?.metadata?.ekatena_conectado)
                           ? <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '8px', padding: '0.6rem', color: '#065F46', fontSize: '0.8rem', fontWeight: '600' }}>
                               ⚡ Ekatena conectado · Procesando score
                             </div>
@@ -506,7 +506,7 @@ export default function KycAdminPage() {
                               Integración pendiente
                             </div>
                         }
-                        {selected.metadata?.ekatena_rfc && (
+                        {!!(selected?.metadata?.ekatena_rfc) && (
                           <div style={{ color: cl.gray400, fontSize: '0.72rem', marginTop: '0.5rem', fontFamily: 'monospace' }}>
                             RFC consultado: {selected.metadata.ekatena_rfc as string}
                           </div>
