@@ -1,545 +1,725 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase-client'
-import { cl } from '@/lib/design'
-import {
-  IconShield, IconSearch, IconDoc, IconHistory, IconCheck, IconX,
-  IconUser, IconFilter, IconClock, IconInfo, IconBuilding
-} from '@/components/Icons'
+import React from 'react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface Consulta {
-  id: string; nombre: string; tipo: string; resultado: 'limpio' | 'alerta' | 'coincidencia'
-  listas_verificadas: string[]; fecha: string; detalles?: string
+type Section = 'dashboard' | 'inversionistas' | 'solicitantes' | 'listas' | 'reportes' | 'matriz' | 'auditoria'
+type RiesgoNivel = 'bajo' | 'medio' | 'alto'
+
+interface Inversionista {
+  id: string; nombre: string; rfc: string; tipo: string; email: string
+  nivel_riesgo: RiesgoNivel; status: string; created_at: string
+  fuente_recursos?: string; pais?: string; pep?: boolean
 }
-interface ReporteConfig { id: string; nombre: string; desc: string; periodicidad: string; plazo: string; icon: React.ReactNode }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-const LISTAS = ['OFAC SDN', 'SAT 69-B', 'ONU Sanciones', 'UIF México', 'PEPs México', 'Interpol']
+interface Solicitante {
+  id: string; razon_social: string; rfc: string; tipo_persona: string
+  giro: string; status: string; created_at: string; metadata?: Record<string, unknown>
+}
 
-const REPORTES: ReporteConfig[] = [
-  { id: 'R01', nombre: 'R01 — Operaciones Relevantes', desc: 'Operaciones en efectivo ≥ $7,500 USD o equivalente. Art. 17 LFPIORPI.', periodicidad: 'Mensual', plazo: '17 días hábiles', icon: <IconDoc size={18} color="#0F7BF4" /> },
-  { id: 'R10', nombre: 'R10 — Operaciones Inusuales', desc: 'Operaciones que no correspondan al perfil transaccional del cliente. Art. 18 LFPIORPI.', periodicidad: 'Mensual', plazo: '60 días naturales', icon: <IconDoc size={18} color="#F59E0B" /> },
-  { id: 'R27', nombre: 'R27 — Operaciones Preocupantes', desc: 'Conductas de empleados o directivos que pudieran favorecer PLD/FT.', periodicidad: 'Inmediato', plazo: '24 horas', icon: <IconDoc size={18} color="#EF4444" /> },
-  { id: 'IFT24', nombre: 'IFT-24 — Informe Semestral CNBV', desc: 'Reporte de cumplimiento PLD del semestre. Obligatorio para IFC reguladas por CUITF Art. 47.', periodicidad: 'Semestral', plazo: '15 días hábiles', icon: <IconDoc size={18} color="#8B5CF6" /> },
+interface ListaConsulta {
+  nombre: string; rfc?: string; resultado: 'limpio' | 'alerta' | 'bloqueado'; listas: string[]; fecha: string
+}
+
+// ─── Design tokens ────────────────────────────────────────────────────────────
+const navy = '#0B1120'
+const navyLight = '#111827'
+const navyBorder = '#1E2D45'
+const accent = '#3B82F6'
+const accentGreen = '#10B981'
+const accentRed = '#EF4444'
+const accentYellow = '#F59E0B'
+const textPrimary = '#F1F5F9'
+const textSecondary = '#94A3B8'
+const textMuted = '#475569'
+const font = "'IBM Plex Sans', system-ui, sans-serif"
+const fontMono = "'IBM Plex Mono', monospace"
+
+// ─── Risk config ─────────────────────────────────────────────────────────────
+const RIESGO: Record<RiesgoNivel, { label: string; color: string; bg: string; dot: string }> = {
+  bajo:  { label: 'Bajo',  color: '#10B981', bg: 'rgba(16,185,129,0.1)',  dot: '#10B981' },
+  medio: { label: 'Medio', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)',  dot: '#F59E0B' },
+  alto:  { label: 'Alto',  color: '#EF4444', bg: 'rgba(239,68,68,0.1)',   dot: '#EF4444' },
+}
+
+// ─── Nav items ────────────────────────────────────────────────────────────────
+const NAV = [
+  { id: 'dashboard',      label: 'Dashboard',       icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+  { id: 'inversionistas', label: 'Inversionistas',  icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
+  { id: 'solicitantes',   label: 'Solicitantes',    icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+  { id: 'listas',         label: 'Consulta Listas', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
+  { id: 'reportes',       label: 'Reportes CNBV',   icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+  { id: 'matriz',         label: 'Matriz de Riesgo',icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
+  { id: 'auditoria',      label: 'Auditoría',       icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
 ]
 
-const RESULTADO_STYLE = {
-  limpio: { color: '#065F46', bg: '#ECFDF5', dot: '#10B981', label: 'Limpio' },
-  alerta: { color: '#92400E', bg: '#FFFBEB', dot: '#F59E0B', label: 'Alerta' },
-  coincidencia: { color: '#991B1B', bg: '#FEF2F2', dot: '#EF4444', label: 'Coincidencia' },
-}
+// ─── Reportes config ──────────────────────────────────────────────────────────
+const REPORTES = [
+  { id: 'R01', nombre: 'R01 — Operaciones Relevantes', freq: 'Mensual', desc: 'Operaciones ≥ $7,500 USD o equivalente. Plazo: 10 días hábiles del mes siguiente.', color: accent, status: 'pendiente', vence: '2026-04-10' },
+  { id: 'R10', nombre: 'R10 — Operaciones Inusuales', freq: 'Cuando proceda', desc: 'Operaciones que no concuerdan con el perfil transaccional del cliente.', color: accentYellow, status: 'al_corriente', vence: null },
+  { id: 'R27', nombre: 'R27 — Ops. Internas Preocupantes', freq: '24 horas', desc: 'Conductas de directivos o empleados que puedan actualizar supuestos de LD/FT.', color: accentRed, status: 'al_corriente', vence: null },
+  { id: 'IFT24', nombre: 'IFT-24 — Informe Semestral', freq: 'Semestral', desc: 'Informe de cumplimiento del Oficial ante el Consejo de Administración.', color: accentGreen, status: 'presentado', vence: '2026-07-31' },
+]
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+const LISTAS_CONFIG = [
+  { id: 'ofac', nombre: 'OFAC SDN', desc: 'Office of Foreign Assets Control — EUA' },
+  { id: 'sat69b', nombre: 'SAT 69-B', desc: 'Contribuyentes con operaciones inexistentes' },
+  { id: 'onu', nombre: 'ONU Sanciones', desc: 'Consejo de Seguridad — Resoluciones' },
+  { id: 'uif', nombre: 'UIF México', desc: 'Unidad de Inteligencia Financiera SHCP' },
+  { id: 'peps', nombre: 'PEPs México', desc: 'Personas Expuestas Políticamente' },
+  { id: 'interpol', nombre: 'Interpol', desc: 'Avisos rojos internacionales' },
+]
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function PldPage() {
-  const [tab, setTab] = useState<'consulta' | 'historial' | 'reportes' | 'matrices'>('consulta')
+  const [section, setSection] = useState<Section>('dashboard')
   const [userEmail, setUserEmail] = useState('')
-  const [consultas, setConsultas] = useState<Consulta[]>([])
-  const [loading, setLoading] = useState(false)
-  const [nombre, setNombre] = useState('')
-  const [tipo, setTipo] = useState('persona_fisica')
-  const [listasSeleccionadas, setListasSeleccionadas] = useState<string[]>(LISTAS)
-  const [resultado, setResultado] = useState<Consulta | null>(null)
-  const [buscando, setBuscando] = useState(false)
-  const [csvFile, setCsvFile] = useState<File | null>(null)
-  const [csvResults, setCsvResults] = useState<Consulta[]>([])
-  const [procesandoCsv, setProcesandoCsv] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const [userRole, setUserRole] = useState<'pld_admin' | 'pld_oficial' | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  // Inversionistas state
+  const [inversionistas, setInversionistas] = useState<Inversionista[]>([])
+  const [invSearch, setInvSearch] = useState('')
+  const [showAddInv, setShowAddInv] = useState(false)
+  const [newInv, setNewInv] = useState({ nombre: '', rfc: '', tipo: 'persona_fisica', email: '', fuente_recursos: '', pais: 'MX', pep: false })
+  const [invSaving, setInvSaving] = useState(false)
+
+  // Solicitantes state
+  const [solicitantes, setSolicitantes] = useState<Solicitante[]>([])
+  const [solSearch, setSolSearch] = useState('')
+
+  // Lista consulta state
+  const [listaQuery, setListaQuery] = useState('')
+  const [listaRfc, setListaRfc] = useState('')
+  const [listaSelected, setListaSelected] = useState<string[]>(['ofac', 'sat69b', 'onu', 'uif', 'peps'])
+  const [listaResult, setListaResult] = useState<ListaConsulta | null>(null)
+  const [listaSearching, setListaSearching] = useState(false)
+  const [historialConsultas, setHistorialConsultas] = useState<ListaConsulta[]>([])
+
+  // Token
+  const [sessionToken, setSessionToken] = useState('')
 
   useEffect(() => {
-    const load = async () => {
+    const init = async () => {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { window.location.href = '/login'; return }
+      if (!user) { window.location.href = '/pld/login'; return }
       setUserEmail(user.email || '')
-      // Cargar historial simulado por ahora
-      setConsultas([
-        { id: '1', nombre: 'Empresa Ejemplo SA', tipo: 'persona_moral', resultado: 'limpio', listas_verificadas: LISTAS, fecha: new Date(Date.now() - 86400000).toISOString(), detalles: 'Sin coincidencias en ninguna lista' },
-        { id: '2', nombre: 'Juan Pérez García', tipo: 'persona_fisica', resultado: 'alerta', listas_verificadas: ['OFAC SDN', 'SAT 69-B'], fecha: new Date(Date.now() - 172800000).toISOString(), detalles: 'Nombre similar encontrado en lista SAT 69-B — requiere verificación manual' },
-      ])
+
+      const adminEmails = ['luis@crowdlink.mx', 'lalvarezzapfe@gmail.com']
+      const oficialEmails = ['pld@crowdlink.mx']
+
+      if (adminEmails.includes(user.email || '')) setUserRole('pld_admin')
+      else if (oficialEmails.includes(user.email || '')) setUserRole('pld_oficial')
+      else { window.location.href = '/gate'; return }
+
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.access_token) setSessionToken(session.access_token)
+
+      setLoading(false)
     }
-    load()
+    init()
   }, [])
 
-  const toggleLista = (l: string) => {
-    setListasSeleccionadas(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l])
-  }
+  const loadSolicitantes = useCallback(async () => {
+    if (!sessionToken) return
+    const res = await fetch('/api/v1/kyc/admin/empresas', { headers: { 'Authorization': 'Bearer ' + sessionToken } })
+    if (res.ok) { const d = await res.json(); setSolicitantes(d.empresas || []) }
+  }, [sessionToken])
 
-  const handleConsulta = async () => {
-    if (!nombre.trim()) return
-    setBuscando(true)
-    setResultado(null)
-    await new Promise(r => setTimeout(r, 1800))
-    // Simulación: nombres con ciertas letras generan alerta
-    const hasAlert = nombre.toLowerCase().includes('alert') || nombre.toLowerCase().includes('sancion')
-    const hasHit = nombre.toLowerCase().includes('ofac') || nombre.toLowerCase().includes('coincidencia')
-    const res: Consulta = {
-      id: Date.now().toString(),
-      nombre, tipo,
-      resultado: hasHit ? 'coincidencia' : hasAlert ? 'alerta' : 'limpio',
-      listas_verificadas: listasSeleccionadas,
+  useEffect(() => {
+    if (section === 'solicitantes' && sessionToken) loadSolicitantes()
+  }, [section, sessionToken, loadSolicitantes])
+
+  const handleListaSearch = async () => {
+    if (!listaQuery.trim()) return
+    setListaSearching(true)
+    // Simulate list check — placeholder until real API integration
+    await new Promise(r => setTimeout(r, 1200))
+    const result: ListaConsulta = {
+      nombre: listaQuery.trim(),
+      rfc: listaRfc.trim() || undefined,
+      resultado: 'limpio',
+      listas: listaSelected,
       fecha: new Date().toISOString(),
-      detalles: hasHit
-        ? `Coincidencia encontrada en OFAC SDN List. Designado el 12/03/2019. Requiere reporte R27 inmediato.`
-        : hasAlert
-          ? 'Nombre similar encontrado en lista SAT 69-B artículo 69. Verificar con RFC oficial.'
-          : `Sin coincidencias en ${listasSeleccionadas.length} listas verificadas.`,
     }
-    setResultado(res)
-    setConsultas(prev => [res, ...prev])
-    setBuscando(false)
+    setListaResult(result)
+    setHistorialConsultas(prev => [result, ...prev.slice(0, 19)])
+    setListaSearching(false)
   }
 
-  const handleCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setCsvFile(file)
-    setProcesandoCsv(true)
-    await new Promise(r => setTimeout(r, 2500))
-    // Simular resultados CSV
-    setCsvResults([
-      { id: 'c1', nombre: 'Empresa ABC SA de CV', tipo: 'persona_moral', resultado: 'limpio', listas_verificadas: LISTAS, fecha: new Date().toISOString() },
-      { id: 'c2', nombre: 'Juan Carlos Martínez', tipo: 'persona_fisica', resultado: 'alerta', listas_verificadas: LISTAS, fecha: new Date().toISOString(), detalles: 'Similar en SAT 69-B' },
-      { id: 'c3', nombre: 'Grupo Industrial XYZ', tipo: 'persona_moral', resultado: 'limpio', listas_verificadas: LISTAS, fecha: new Date().toISOString() },
-    ])
-    setProcesandoCsv(false)
+  const handleAddInversionista = async () => {
+    if (!newInv.nombre || !newInv.rfc || !newInv.email) return
+    setInvSaving(true)
+    await new Promise(r => setTimeout(r, 600))
+    const inv: Inversionista = {
+      id: crypto.randomUUID(),
+      ...newInv,
+      nivel_riesgo: newInv.pep ? 'alto' : 'bajo',
+      status: 'activo',
+      created_at: new Date().toISOString(),
+    }
+    setInversionistas(prev => [inv, ...prev])
+    setNewInv({ nombre: '', rfc: '', tipo: 'persona_fisica', email: '', fuente_recursos: '', pais: 'MX', pep: false })
+    setShowAddInv(false)
+    setInvSaving(false)
   }
 
-  const NAV_TABS = [
-    { id: 'consulta', label: 'Consulta Individual', icon: <IconSearch size={16} /> },
-    { id: 'historial', label: 'Historial', icon: <IconHistory size={16} /> },
-    { id: 'reportes', label: 'Reportes CNBV', icon: <IconDoc size={16} /> },
-    { id: 'matrices', label: 'Matrices de Riesgo', icon: <IconFilter size={16} /> },
-  ]
+  if (loading) return (
+    <div style={{ minHeight: '100vh', background: navy, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: '32px', height: '32px', border: '2.5px solid rgba(59,130,246,0.2)', borderTopColor: accent, borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
 
   return (
-    <div style={{ height: '100vh', display: 'flex', fontFamily: cl.fontFamily, background: cl.gray50, overflow: 'hidden' }}>
+    <div style={{ minHeight: '100vh', background: navy, display: 'flex', fontFamily: font, color: textPrimary }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+        * { box-sizing: border-box; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: ${navyBorder}; border-radius: 2px; }
+        .nav-item:hover { background: rgba(59,130,246,0.08) !important; }
+        .row-hover:hover { background: rgba(255,255,255,0.03) !important; cursor: pointer; }
+        .btn-ghost:hover { opacity: 0.8; }
+        input, select, textarea { outline: none; }
+        input:focus, select:focus, textarea:focus { border-color: ${accent} !important; box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
+      `}</style>
 
-      {/* SIDEBAR */}
-      <div style={{ width: '64px', flexShrink: 0, background: '#0B1120', display: 'flex', flexDirection: 'column', alignItems: 'center', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-        <div style={{ width: '100%', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg,#0F7BF4,#3DFFA0)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <IconShield size={16} color="white" strokeWidth={2} />
-          </div>
-        </div>
-        <div title="Sistema PLD" style={{ width: '44px', height: '44px', borderRadius: '10px', margin: '0.75rem 0', background: 'rgba(15,123,244,0.2)', border: '1px solid rgba(15,123,244,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0F7BF4' }}>
-          <IconShield size={20} />
-        </div>
-        <div style={{ marginTop: 'auto', paddingBottom: '1rem' }}>
-          <a href="/gate" title="Módulos" style={{ width: '44px', height: '44px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.25)', textDecoration: 'none' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          </a>
-        </div>
-      </div>
-
-      {/* MAIN */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-
-        {/* Top nav */}
-        <div style={{ height: '60px', background: cl.white, borderBottom: `1px solid ${cl.gray200}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 1.75rem', flexShrink: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <a href="/gate" style={{ display: 'flex', alignItems: 'center' }}>
-              <img src="/crowdlink-logo.png" alt="Crowdlink" style={{ height: '22px', width: 'auto' }} />
-            </a>
-            <div style={{ width: '1px', height: '18px', background: cl.gray200 }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <IconShield size={16} color="#0F7BF4" />
-              <span style={{ color: cl.gray700, fontSize: '0.85rem', fontWeight: '700' }}>Sistema PLD</span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ background: '#ECFDF5', border: '1px solid #BBF7D0', borderRadius: '9999px', padding: '0.3rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10B981' }} />
-              <span style={{ color: '#065F46', fontSize: '0.72rem', fontWeight: '600' }}>Sistema activo</span>
-            </div>
-            <span style={{ color: cl.gray400, fontSize: '0.78rem' }}>{userEmail}</span>
+      {/* ── SIDEBAR ── */}
+      <div style={{ width: '224px', background: navyLight, borderRight: `1px solid ${navyBorder}`, display: 'flex', flexDirection: 'column', position: 'fixed', top: 0, bottom: 0, left: 0, zIndex: 10 }}>
+        {/* Logo */}
+        <div style={{ padding: '1.25rem 1.25rem 1rem', borderBottom: `1px solid ${navyBorder}` }}>
+          <img src="/crowdlink-logo.png" alt="Crowdlink" style={{ height: '20px', width: 'auto', filter: 'brightness(0) invert(1)', opacity: 0.9 }} />
+          <div style={{ marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: accentRed, boxShadow: `0 0 6px ${accentRed}` }} />
+            <span style={{ color: textMuted, fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.12em' }}>SISTEMA PLD</span>
           </div>
         </div>
 
-        {/* Tab bar */}
-        <div style={{ background: cl.white, borderBottom: `1px solid ${cl.gray200}`, padding: '0 1.75rem', display: 'flex', gap: '0', flexShrink: 0 }}>
-          {NAV_TABS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id as typeof tab)} style={{
-              background: 'none', border: 'none', padding: '0.8rem 1.1rem',
-              color: tab === t.id ? '#0F7BF4' : cl.gray400,
-              fontWeight: tab === t.id ? '700' : '400', fontSize: '0.83rem',
-              cursor: 'pointer', fontFamily: cl.fontFamily,
-              borderBottom: tab === t.id ? '2px solid #0F7BF4' : '2px solid transparent',
-              display: 'flex', alignItems: 'center', gap: '0.45rem',
-            }}>
-              {t.icon}{t.label}
+        {/* Nav */}
+        <nav style={{ flex: 1, padding: '0.75rem 0.5rem', overflowY: 'auto' }}>
+          {NAV.map(item => (
+            <button key={item.id} onClick={() => setSection(item.id as Section)} className="nav-item"
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.75rem', borderRadius: '8px', border: 'none', background: section === item.id ? 'rgba(59,130,246,0.12)' : 'transparent', color: section === item.id ? '#60A5FA' : textSecondary, fontSize: '0.82rem', fontWeight: section === item.id ? '600' : '400', cursor: 'pointer', fontFamily: font, marginBottom: '2px', transition: 'all 0.15s', textAlign: 'left' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <path d={item.icon} />
+              </svg>
+              {item.label}
             </button>
           ))}
-        </div>
+        </nav>
 
-        {/* Content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '2rem' }}>
-
-          {/* ── CONSULTA ── */}
-          {tab === 'consulta' && (
-            <div style={{ maxWidth: '900px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 380px', gap: '1.5rem', alignItems: 'start' }}>
-
-              {/* Form */}
-              <div>
-                <PldCard title="Nueva Consulta de Listas" icon={<IconSearch size={16} color="#0F7BF4" />}>
-                  <div style={{ display: 'grid', gap: '1.1rem' }}>
-                    <div>
-                      <label style={labelStyle}>Nombre o Razón Social</label>
-                      <div style={{ position: 'relative' }}>
-                        <input
-                          value={nombre} onChange={e => setNombre(e.target.value)}
-                          onKeyDown={e => e.key === 'Enter' && handleConsulta()}
-                          placeholder="Ej. Juan García López / Empresa SA de CV"
-                          style={{ ...inputStyle, paddingRight: '110px' }}
-                          autoFocus
-                        />
-                        <button onClick={handleConsulta} disabled={buscando || !nombre.trim()} style={{
-                          position: 'absolute', right: '4px', top: '4px', bottom: '4px',
-                          background: '#0F7BF4', color: 'white', border: 'none',
-                          borderRadius: '7px', padding: '0 1rem',
-                          fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer',
-                          fontFamily: cl.fontFamily, opacity: !nombre.trim() ? 0.5 : 1,
-                          display: 'flex', alignItems: 'center', gap: '0.4rem',
-                        }}>
-                          {buscando ? <Spinner /> : <IconSearch size={14} color="white" />}
-                          {buscando ? 'Buscando...' : 'Consultar'}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label style={labelStyle}>Tipo de persona</label>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        {[{ v: 'persona_fisica', l: 'Persona Física' }, { v: 'persona_moral', l: 'Persona Moral' }].map(o => (
-                          <button key={o.v} onClick={() => setTipo(o.v)} style={{
-                            flex: 1, padding: '0.6rem', borderRadius: '8px', cursor: 'pointer',
-                            border: tipo === o.v ? '2px solid #0F7BF4' : `1.5px solid ${cl.gray200}`,
-                            background: tipo === o.v ? '#EBF3FF' : cl.white,
-                            color: tipo === o.v ? '#0F7BF4' : cl.gray500,
-                            fontSize: '0.82rem', fontWeight: tipo === o.v ? '700' : '400',
-                            fontFamily: cl.fontFamily, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
-                          }}>
-                            {tipo === o.v ? <IconCheck size={14} color="#0F7BF4" /> : null}
-                            {o.l}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label style={labelStyle}>Listas a verificar ({listasSeleccionadas.length}/{LISTAS.length})</label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                        {LISTAS.map(l => {
-                          const active = listasSeleccionadas.includes(l)
-                          return (
-                            <button key={l} onClick={() => toggleLista(l)} style={{
-                              padding: '0.3rem 0.75rem', borderRadius: '9999px', cursor: 'pointer',
-                              border: `1.5px solid ${active ? '#0F7BF4' : cl.gray200}`,
-                              background: active ? '#EBF3FF' : cl.gray50,
-                              color: active ? '#0F7BF4' : cl.gray400,
-                              fontSize: '0.72rem', fontWeight: active ? '700' : '400',
-                              fontFamily: cl.fontFamily,
-                            }}>{l}</button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </PldCard>
-
-                {/* Carga CSV */}
-                <div style={{ marginTop: '1rem' }}>
-                  <PldCard title="Consulta Masiva por CSV" icon={<IconDoc size={16} color="#0F7BF4" />}>
-                    <p style={{ color: cl.gray400, fontSize: '0.8rem', margin: '0 0 1rem', lineHeight: 1.6 }}>
-                      Carga un archivo CSV con columnas: <code style={{ background: cl.gray100, padding: '0.1rem 0.3rem', borderRadius: '4px', fontSize: '0.75rem' }}>nombre, tipo, rfc</code>
-                    </p>
-                    <div
-                      onClick={() => fileRef.current?.click()}
-                      style={{
-                        border: `2px dashed ${csvFile ? '#0F7BF4' : cl.gray200}`,
-                        borderRadius: '10px', padding: '1.5rem', textAlign: 'center',
-                        background: csvFile ? '#EBF3FF' : cl.gray50, cursor: 'pointer',
-                        transition: 'all 0.2s',
-                      }}
-                    >
-                      <IconDoc size={28} color={csvFile ? '#0F7BF4' : cl.gray300} />
-                      <div style={{ color: csvFile ? '#0F7BF4' : cl.gray400, fontSize: '0.82rem', marginTop: '0.5rem', fontWeight: csvFile ? '600' : '400' }}>
-                        {procesandoCsv ? 'Procesando...' : csvFile ? csvFile.name : 'Haz clic para subir CSV'}
-                      </div>
-                      <input ref={fileRef} type="file" accept=".csv" onChange={handleCsvUpload} style={{ display: 'none' }} />
-                    </div>
-
-                    {csvResults.length > 0 && (
-                      <div style={{ marginTop: '1rem' }}>
-                        <div style={{ color: cl.gray600, fontSize: '0.78rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                          {csvResults.length} registros procesados
-                        </div>
-                        {csvResults.map(r => {
-                          const rs = RESULTADO_STYLE[r.resultado]
-                          return (
-                            <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0', borderBottom: `1px solid ${cl.gray100}` }}>
-                              <div>
-                                <div style={{ color: cl.gray800, fontSize: '0.82rem', fontWeight: '500' }}>{r.nombre}</div>
-                                {r.detalles && <div style={{ color: cl.gray400, fontSize: '0.72rem' }}>{r.detalles}</div>}
-                              </div>
-                              <span style={{ background: rs.bg, color: rs.color, fontSize: '0.68rem', fontWeight: '700', padding: '0.2rem 0.6rem', borderRadius: '9999px', flexShrink: 0 }}>{rs.label}</span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </PldCard>
-                </div>
-              </div>
-
-              {/* Resultado */}
-              <div>
-                {buscando && (
-                  <PldCard title="Consultando listas...">
-                    <div style={{ textAlign: 'center', padding: '2rem' }}>
-                      <Spinner large />
-                      <div style={{ color: cl.gray400, fontSize: '0.82rem', marginTop: '1rem' }}>Verificando en {listasSeleccionadas.length} listas</div>
-                    </div>
-                  </PldCard>
-                )}
-
-                {resultado && !buscando && (() => {
-                  const rs = RESULTADO_STYLE[resultado.resultado]
-                  return (
-                    <div>
-                      <PldCard title="Resultado de Consulta" icon={
-                        resultado.resultado === 'limpio' ? <IconCheck size={16} color="#10B981" /> :
-                        resultado.resultado === 'coincidencia' ? <IconX size={16} color="#EF4444" /> :
-                        <IconClock size={16} color="#F59E0B" />
-                      }>
-                        <div style={{ textAlign: 'center', padding: '1rem 0 1.5rem' }}>
-                          <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: rs.bg, border: `2px solid ${rs.dot}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', boxShadow: `0 0 24px ${rs.dot}30` }}>
-                            {resultado.resultado === 'limpio' ? <IconCheck size={28} color={rs.dot} strokeWidth={2.5} /> :
-                             resultado.resultado === 'coincidencia' ? <IconX size={28} color={rs.dot} strokeWidth={2.5} /> :
-                             <IconClock size={28} color={rs.dot} />}
-                          </div>
-                          <span style={{ background: rs.bg, color: rs.color, fontSize: '0.88rem', fontWeight: '800', padding: '0.4rem 1.2rem', borderRadius: '9999px', border: `1.5px solid ${rs.dot}40` }}>{rs.label}</span>
-                        </div>
-
-                        <div style={{ display: 'grid', gap: '0.5rem', marginBottom: '1rem' }}>
-                          <DRow2 l="Nombre" v={resultado.nombre} />
-                          <DRow2 l="Tipo" v={resultado.tipo === 'persona_fisica' ? 'Persona Física' : 'Persona Moral'} />
-                          <DRow2 l="Listas verificadas" v={`${resultado.listas_verificadas.length} listas`} />
-                          <DRow2 l="Fecha" v={new Date(resultado.fecha).toLocaleString('es-MX')} />
-                        </div>
-
-                        {resultado.detalles && (
-                          <div style={{ background: rs.bg, border: `1px solid ${rs.dot}30`, borderRadius: '8px', padding: '0.75rem', marginBottom: '1rem' }}>
-                            <div style={{ color: rs.color, fontSize: '0.8rem', lineHeight: 1.6 }}>{resultado.detalles}</div>
-                          </div>
-                        )}
-
-                        {resultado.resultado === 'coincidencia' && (
-                          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '8px', padding: '0.75rem' }}>
-                            <div style={{ color: '#991B1B', fontSize: '0.78rem', fontWeight: '700', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <IconInfo size={14} color="#991B1B" /> Acción requerida
-                            </div>
-                            <div style={{ color: '#7F1D1D', fontSize: '0.76rem', lineHeight: 1.6 }}>
-                              Generar Reporte R27 ante la UIF dentro de las próximas 24 horas. Suspender relación comercial hasta nueva revisión.
-                            </div>
-                          </div>
-                        )}
-                      </PldCard>
-                    </div>
-                  )
-                })()}
-
-                {/* Listas verificadas chip list */}
-                {resultado && (
-                  <div style={{ marginTop: '1rem' }}>
-                    <PldCard title="Listas verificadas">
-                      <div style={{ display: 'grid', gap: '0.4rem' }}>
-                        {resultado.listas_verificadas.map(l => (
-                          <div key={l} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.45rem 0', borderBottom: `1px solid ${cl.gray50}` }}>
-                            <span style={{ color: cl.gray600, fontSize: '0.8rem' }}>{l}</span>
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: '#065F46', fontSize: '0.72rem', fontWeight: '600' }}>
-                              <IconCheck size={12} color="#10B981" strokeWidth={2.5} /> Verificado
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </PldCard>
-                  </div>
-                )}
-              </div>
+        {/* User */}
+        <div style={{ padding: '0.75rem 1rem', borderTop: `1px solid ${navyBorder}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.6rem' }}>
+            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#60A5FA', fontSize: '0.7rem', fontWeight: '700', flexShrink: 0 }}>
+              {userEmail ? userEmail[0].toUpperCase() : 'U'}
             </div>
-          )}
-
-          {/* ── HISTORIAL ── */}
-          {tab === 'historial' && (
-            <div style={{ maxWidth: '820px', margin: '0 auto' }}>
-              <PldCard title="Historial de Consultas" icon={<IconHistory size={16} color="#0F7BF4" />}>
-                {consultas.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '3rem', color: cl.gray400 }}>Sin consultas registradas</div>
-                ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-                    <thead>
-                      <tr style={{ borderBottom: `2px solid ${cl.gray100}` }}>
-                        {['Nombre / Razón Social', 'Tipo', 'Listas', 'Resultado', 'Fecha'].map(h => (
-                          <th key={h} style={{ color: cl.gray400, fontWeight: '600', fontSize: '0.72rem', textAlign: 'left', padding: '0.5rem 0.75rem', letterSpacing: '0.04em' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {consultas.map(c => {
-                        const rs = RESULTADO_STYLE[c.resultado]
-                        return (
-                          <tr key={c.id} style={{ borderBottom: `1px solid ${cl.gray50}` }}>
-                            <td style={{ padding: '0.75rem', color: cl.gray800, fontWeight: '500' }}>{c.nombre}</td>
-                            <td style={{ padding: '0.75rem', color: cl.gray500, fontSize: '0.75rem' }}>{c.tipo === 'persona_fisica' ? 'Física' : 'Moral'}</td>
-                            <td style={{ padding: '0.75rem', color: cl.gray400, fontSize: '0.73rem' }}>{c.listas_verificadas.length} listas</td>
-                            <td style={{ padding: '0.75rem' }}>
-                              <span style={{ background: rs.bg, color: rs.color, fontSize: '0.68rem', fontWeight: '700', padding: '0.2rem 0.6rem', borderRadius: '9999px' }}>{rs.label}</span>
-                            </td>
-                            <td style={{ padding: '0.75rem', color: cl.gray400, fontSize: '0.73rem' }}>
-                              {new Date(c.fecha).toLocaleDateString('es-MX')}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </PldCard>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ color: textPrimary, fontSize: '0.75rem', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userEmail}</div>
+              <div style={{ color: textMuted, fontSize: '0.65rem' }}>{userRole === 'pld_admin' ? 'Super Admin' : 'Oficial de Cumplimiento'}</div>
             </div>
-          )}
-
-          {/* ── REPORTES CNBV ── */}
-          {tab === 'reportes' && (
-            <div style={{ maxWidth: '820px', margin: '0 auto', display: 'grid', gap: '1rem' }}>
-              <div style={{ marginBottom: '0.5rem' }}>
-                <h2 style={{ color: cl.gray900, fontSize: '1.1rem', fontWeight: '700', margin: '0 0 0.25rem' }}>Reportes Regulatorios CNBV / UIF</h2>
-                <p style={{ color: cl.gray400, fontSize: '0.85rem', margin: 0 }}>
-                  Obligaciones de reporte para IFC bajo CUITF Art. 47 y LFPIORPI
-                </p>
-              </div>
-
-              {REPORTES.map(r => (
-                <PldCard key={r.id} title="" icon={null}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
-                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start', flex: 1 }}>
-                      <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: cl.blueLight, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        {r.icon}
-                      </div>
-                      <div>
-                        <div style={{ color: cl.gray900, fontSize: '0.9rem', fontWeight: '700', marginBottom: '0.3rem' }}>{r.nombre}</div>
-                        <div style={{ color: cl.gray500, fontSize: '0.8rem', lineHeight: 1.6, marginBottom: '0.6rem' }}>{r.desc}</div>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <span style={{ background: cl.gray100, color: cl.gray600, fontSize: '0.7rem', fontWeight: '600', padding: '0.2rem 0.6rem', borderRadius: '9999px' }}>
-                            {r.periodicidad}
-                          </span>
-                          <span style={{ background: '#FEF9C3', color: '#854D0E', fontSize: '0.7rem', fontWeight: '600', padding: '0.2rem 0.6rem', borderRadius: '9999px' }}>
-                            Plazo: {r.plazo}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flexShrink: 0 }}>
-                      <button style={{ background: '#0F7BF4', color: 'white', border: 'none', borderRadius: '8px', padding: '0.5rem 1rem', fontSize: '0.78rem', fontWeight: '700', cursor: 'pointer', fontFamily: cl.fontFamily, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <IconDoc size={14} color="white" /> Generar
-                      </button>
-                      <button style={{ background: cl.gray100, color: cl.gray600, border: `1px solid ${cl.gray200}`, borderRadius: '8px', padding: '0.5rem 1rem', fontSize: '0.78rem', fontWeight: '600', cursor: 'pointer', fontFamily: cl.fontFamily }}>
-                        Historial
-                      </button>
-                    </div>
-                  </div>
-                </PldCard>
-              ))}
-
-              {/* Calendario regulatorio */}
-              <PldCard title="Calendario de Obligaciones" icon={<IconClock size={16} color="#0F7BF4" />}>
-                <div style={{ display: 'grid', gap: '0.5rem', paddingTop: '0.25rem' }}>
-                  {[
-                    { rep: 'R01', vence: '17 abr 2026', estado: 'pending', desc: 'Operaciones relevantes — Marzo 2026' },
-                    { rep: 'IFT-24', vence: '15 jul 2026', estado: 'upcoming', desc: 'Informe semestral 1er semestre 2026' },
-                    { rep: 'R01', vence: '17 mar 2026', estado: 'done', desc: 'Operaciones relevantes — Febrero 2026' },
-                    { rep: 'IFT-24', vence: '15 ene 2026', estado: 'done', desc: 'Informe semestral 2do semestre 2025' },
-                  ].map((item, i) => {
-                    const stateStyle = {
-                      done: { color: '#065F46', bg: '#ECFDF5', dot: '#10B981', label: 'Presentado' },
-                      pending: { color: '#92400E', bg: '#FFFBEB', dot: '#F59E0B', label: 'Pendiente' },
-                      upcoming: { color: '#1D4ED8', bg: '#EFF6FF', dot: '#3B82F6', label: 'Próximo' },
-                    }[item.estado] || { color: cl.gray500, bg: cl.gray100, dot: cl.gray400, label: '' }
-                    return (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.7rem', background: cl.gray50, borderRadius: '8px', border: `1px solid ${cl.gray100}` }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: stateStyle.dot, flexShrink: 0 }} />
-                          <div>
-                            <span style={{ color: cl.gray800, fontSize: '0.82rem', fontWeight: '600' }}>{item.rep}</span>
-                            <span style={{ color: cl.gray400, fontSize: '0.78rem', marginLeft: '0.5rem' }}>{item.desc}</span>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <span style={{ color: cl.gray400, fontSize: '0.73rem' }}>Vence: {item.vence}</span>
-                          <span style={{ background: stateStyle.bg, color: stateStyle.color, fontSize: '0.68rem', fontWeight: '700', padding: '0.18rem 0.55rem', borderRadius: '9999px' }}>{stateStyle.label}</span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </PldCard>
-            </div>
-          )}
-
-          {/* ── MATRICES ── */}
-          {tab === 'matrices' && (
-            <div style={{ maxWidth: '820px', margin: '0 auto' }}>
-              <PldCard title="Matrices de Riesgo PLD" icon={<IconFilter size={16} color="#0F7BF4" />}>
-                <div style={{ textAlign: 'center', padding: '3rem', color: cl.gray400 }}>
-                  <IconFilter size={40} color={cl.gray200} />
-                  <div style={{ fontSize: '0.9rem', marginTop: '1rem', fontWeight: '500' }}>En construcción</div>
-                  <div style={{ fontSize: '0.8rem', marginTop: '0.4rem' }}>Matrices de riesgo por cliente, producto y geografía</div>
-                </div>
-              </PldCard>
-            </div>
-          )}
-
+          </div>
+          <div style={{ display: 'flex', gap: '0.35rem' }}>
+            <a href="/gate" style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '6px', padding: '0.4rem', fontSize: '0.7rem', color: textMuted, textDecoration: 'none', textAlign: 'center', display: 'block' }} className="btn-ghost">
+              Módulos
+            </a>
+            <button onClick={async () => { await createClient().auth.signOut(); window.location.href = '/gate' }}
+              style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '6px', padding: '0.4rem', fontSize: '0.7rem', color: textMuted, cursor: 'pointer', fontFamily: font }} className="btn-ghost">
+              Salir
+            </button>
+          </div>
         </div>
       </div>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');`}</style>
-    </div>
-  )
-}
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-function PldCard({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div style={{ background: cl.white, border: `1px solid ${cl.gray200}`, borderRadius: '14px', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-      {title && (
-        <div style={{ padding: '0.85rem 1.25rem', borderBottom: `1px solid ${cl.gray100}`, display: 'flex', alignItems: 'center', gap: '0.5rem', background: cl.gray50 }}>
-          {icon}
-          <span style={{ color: cl.gray700, fontSize: '0.82rem', fontWeight: '700' }}>{title}</span>
+      {/* ── MAIN CONTENT ── */}
+      <div style={{ marginLeft: '224px', flex: 1, minHeight: '100vh', overflowY: 'auto' }}>
+
+        {/* ── DASHBOARD ── */}
+        {section === 'dashboard' && (
+          <div style={{ padding: '2rem', animation: 'fadeIn 0.2s ease' }}>
+            <div style={{ marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: accentRed, boxShadow: `0 0 8px ${accentRed}` }} />
+                <span style={{ color: textMuted, fontSize: '0.72rem', fontWeight: '600', letterSpacing: '0.1em' }}>PLD / CFT — CNBV · Art. 58 LRITF</span>
+              </div>
+              <h1 style={{ color: textPrimary, fontSize: '1.6rem', fontWeight: '700', margin: '0', letterSpacing: '-0.02em' }}>Panel de Cumplimiento</h1>
+              <p style={{ color: textMuted, fontSize: '0.85rem', margin: '0.4rem 0 0' }}>
+                {new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              </p>
+            </div>
+
+            {/* Stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+              {[
+                { label: 'Inversionistas', value: inversionistas.length, sub: 'registrados', color: accent },
+                { label: 'Solicitantes KYC', value: solicitantes.length, sub: 'expedientes', color: accentGreen },
+                { label: 'Consultas listas', value: historialConsultas.length, sub: 'este mes', color: accentYellow },
+                { label: 'Alertas activas', value: 0, sub: 'sin incidencias', color: accentRed },
+              ].map(s => (
+                <div key={s.label} style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', padding: '1.25rem 1.5rem' }}>
+                  <div style={{ color: s.color, fontSize: '2rem', fontWeight: '700', fontFamily: fontMono, lineHeight: 1 }}>{s.value}</div>
+                  <div style={{ color: textPrimary, fontSize: '0.82rem', fontWeight: '500', marginTop: '0.4rem' }}>{s.label}</div>
+                  <div style={{ color: textMuted, fontSize: '0.72rem' }}>{s.sub}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Obligaciones próximas */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+              <div style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', padding: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3 style={{ color: textPrimary, fontSize: '0.9rem', fontWeight: '600', margin: 0 }}>Obligaciones CNBV</h3>
+                  <span style={{ color: textMuted, fontSize: '0.72rem' }}>Calendario 2026</span>
+                </div>
+                {REPORTES.map(r => (
+                  <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.65rem 0', borderBottom: `1px solid ${navyBorder}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: r.color, flexShrink: 0 }} />
+                      <div>
+                        <div style={{ color: textPrimary, fontSize: '0.8rem', fontWeight: '500' }}>{r.id}</div>
+                        <div style={{ color: textMuted, fontSize: '0.68rem' }}>{r.freq}</div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span style={{ fontSize: '0.68rem', fontWeight: '600', padding: '0.15rem 0.55rem', borderRadius: '9999px',
+                        background: r.status === 'presentado' ? 'rgba(16,185,129,0.1)' : r.status === 'pendiente' ? 'rgba(245,158,11,0.1)' : 'rgba(59,130,246,0.1)',
+                        color: r.status === 'presentado' ? accentGreen : r.status === 'pendiente' ? accentYellow : accent,
+                      }}>{r.status === 'presentado' ? 'Presentado' : r.status === 'pendiente' ? 'Pendiente' : 'Al corriente'}</span>
+                      {r.vence && <div style={{ color: textMuted, fontSize: '0.65rem', marginTop: '0.2rem' }}>Vence {new Date(r.vence).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Semáforo de riesgo */}
+              <div style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', padding: '1.25rem' }}>
+                <h3 style={{ color: textPrimary, fontSize: '0.9rem', fontWeight: '600', margin: '0 0 1rem' }}>Semáforo de Cumplimiento</h3>
+                {[
+                  { label: 'Expedientes KYC completos', valor: 85, color: accentGreen },
+                  { label: 'Consultas listas actualizadas', valor: 100, color: accentGreen },
+                  { label: 'Reportes CNBV al corriente', valor: 75, color: accentYellow },
+                  { label: 'Inversionistas con nivel de riesgo', valor: inversionistas.length > 0 ? 100 : 0, color: inversionistas.length > 0 ? accentGreen : accentRed },
+                ].map(item => (
+                  <div key={item.label} style={{ marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+                      <span style={{ color: textSecondary, fontSize: '0.78rem' }}>{item.label}</span>
+                      <span style={{ color: item.color, fontSize: '0.78rem', fontWeight: '600', fontFamily: fontMono }}>{item.valor}%</span>
+                    </div>
+                    <div style={{ height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${item.valor}%`, background: item.color, borderRadius: '2px', transition: 'width 0.5s ease' }} />
+                    </div>
+                  </div>
+                ))}
+                <div style={{ marginTop: '1.25rem', padding: '0.75rem', background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: '8px' }}>
+                  <div style={{ color: accentGreen, fontSize: '0.78rem', fontWeight: '600' }}>✓ Sistema operando dentro de parámetros</div>
+                  <div style={{ color: textMuted, fontSize: '0.7rem', marginTop: '0.2rem' }}>Última actualización: {new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── INVERSIONISTAS ── */}
+        {section === 'inversionistas' && (
+          <div style={{ padding: '2rem', animation: 'fadeIn 0.2s ease' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+              <div>
+                <h1 style={{ color: textPrimary, fontSize: '1.4rem', fontWeight: '700', margin: '0 0 0.3rem', letterSpacing: '-0.02em' }}>Inversionistas</h1>
+                <p style={{ color: textMuted, fontSize: '0.82rem', margin: 0 }}>Registro y gestión de clientes inversionistas conforme a KYC/PLD</p>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <label style={{ background: 'rgba(59,130,246,0.08)', border: `1px solid rgba(59,130,246,0.25)`, borderRadius: '8px', padding: '0.5rem 1rem', fontSize: '0.82rem', color: '#60A5FA', cursor: 'pointer', fontFamily: font, fontWeight: '500' }}>
+                  <input type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={() => alert('Carga masiva — integración Excel próximamente')} />
+                  ↑ Cargar Excel
+                </label>
+                <button onClick={() => setShowAddInv(true)}
+                  style={{ background: accent, color: 'white', border: 'none', borderRadius: '8px', padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: '600', cursor: 'pointer', fontFamily: font }}>
+                  + Nuevo inversionista
+                </button>
+              </div>
+            </div>
+
+            {/* Search */}
+            <div style={{ position: 'relative', marginBottom: '1rem', maxWidth: '360px' }}>
+              <input placeholder="Buscar nombre, RFC..." value={invSearch} onChange={e => setInvSearch(e.target.value)}
+                style={{ width: '100%', background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.55rem 0.75rem 0.55rem 2.25rem', color: textPrimary, fontSize: '0.83rem', fontFamily: font }} />
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={textMuted} strokeWidth="2" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }}>
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </div>
+
+            {/* Table */}
+            <div style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: `1px solid ${navyBorder}` }}>
+                    {['Nombre', 'RFC', 'Tipo', 'Email', 'Nivel Riesgo', 'PEP', 'Fecha', ''].map(h => (
+                      <th key={h} style={{ padding: '0.65rem 1rem', textAlign: 'left', color: textMuted, fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.08em' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {inversionistas.filter(i => !invSearch || i.nombre.toLowerCase().includes(invSearch.toLowerCase()) || i.rfc.toLowerCase().includes(invSearch.toLowerCase())).length === 0 ? (
+                    <tr><td colSpan={8} style={{ textAlign: 'center', padding: '3rem', color: textMuted, fontSize: '0.85rem' }}>
+                      {inversionistas.length === 0 ? 'Sin inversionistas registrados. Agrega el primero o carga un Excel.' : 'Sin resultados'}
+                    </td></tr>
+                  ) : inversionistas.filter(i => !invSearch || i.nombre.toLowerCase().includes(invSearch.toLowerCase()) || i.rfc.toLowerCase().includes(invSearch.toLowerCase())).map((inv, idx) => {
+                    const r = RIESGO[inv.nivel_riesgo]
+                    return (
+                      <tr key={inv.id} className="row-hover" style={{ borderBottom: `1px solid ${navyBorder}` }}>
+                        <td style={{ padding: '0.75rem 1rem', color: textPrimary, fontSize: '0.85rem', fontWeight: '500' }}>{inv.nombre}</td>
+                        <td style={{ padding: '0.75rem 1rem' }}><span style={{ fontFamily: fontMono, fontSize: '0.78rem', color: textSecondary, background: 'rgba(255,255,255,0.04)', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>{inv.rfc}</span></td>
+                        <td style={{ padding: '0.75rem 1rem', color: textMuted, fontSize: '0.8rem' }}>{inv.tipo === 'persona_fisica' ? 'Física' : 'Moral'}</td>
+                        <td style={{ padding: '0.75rem 1rem', color: textMuted, fontSize: '0.8rem' }}>{inv.email}</td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <span style={{ background: r.bg, color: r.color, fontSize: '0.68rem', fontWeight: '600', padding: '0.2rem 0.6rem', borderRadius: '9999px', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: r.dot }} />{r.label}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          {inv.pep ? <span style={{ background: 'rgba(239,68,68,0.1)', color: accentRed, fontSize: '0.65rem', fontWeight: '700', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>PEP</span> : <span style={{ color: textMuted, fontSize: '0.75rem' }}>—</span>}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', color: textMuted, fontSize: '0.75rem' }}>{new Date(inv.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}</td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <button onClick={() => { setListaQuery(inv.nombre); setListaRfc(inv.rfc); setSection('listas') }}
+                            style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '6px', padding: '0.3rem 0.6rem', fontSize: '0.7rem', color: '#60A5FA', cursor: 'pointer', fontFamily: font }}>
+                            Consultar listas
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── SOLICITANTES ── */}
+        {section === 'solicitantes' && (
+          <div style={{ padding: '2rem', animation: 'fadeIn 0.2s ease' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+              <div>
+                <h1 style={{ color: textPrimary, fontSize: '1.4rem', fontWeight: '700', margin: '0 0 0.3rem', letterSpacing: '-0.02em' }}>Solicitantes KYC</h1>
+                <p style={{ color: textMuted, fontSize: '0.82rem', margin: 0 }}>Empresas solicitantes — solo consulta y generación de reportes</p>
+              </div>
+              <button onClick={() => { alert('Reporte ejecutivo PDF — próximamente') }}
+                style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: '8px', padding: '0.5rem 1rem', fontSize: '0.82rem', color: accentGreen, cursor: 'pointer', fontFamily: font, fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 7v10a2 2 0 01-2 2z"/></svg>
+                Reporte PDF ejecutivo
+              </button>
+            </div>
+
+            <div style={{ position: 'relative', marginBottom: '1rem', maxWidth: '360px' }}>
+              <input placeholder="Buscar empresa, RFC..." value={solSearch} onChange={e => setSolSearch(e.target.value)}
+                style={{ width: '100%', background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.55rem 0.75rem 0.55rem 2.25rem', color: textPrimary, fontSize: '0.83rem', fontFamily: font }} />
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={textMuted} strokeWidth="2" style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)' }}>
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </div>
+
+            <div style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: `1px solid ${navyBorder}` }}>
+                    {['Razón Social', 'RFC', 'Tipo', 'Giro', 'Status KYC', 'Fecha', 'Acciones'].map(h => (
+                      <th key={h} style={{ padding: '0.65rem 1rem', textAlign: 'left', color: textMuted, fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.08em' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {solicitantes.length === 0 ? (
+                    <tr><td colSpan={7} style={{ textAlign: 'center', padding: '3rem', color: textMuted }}>
+                      <button onClick={loadSolicitantes} style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '8px', padding: '0.5rem 1.25rem', color: '#60A5FA', cursor: 'pointer', fontFamily: font, fontSize: '0.82rem' }}>
+                        Cargar expedientes
+                      </button>
+                    </td></tr>
+                  ) : solicitantes.filter(s => !solSearch || s.razon_social?.toLowerCase().includes(solSearch.toLowerCase()) || s.rfc?.toLowerCase().includes(solSearch.toLowerCase())).map(sol => {
+                    const sc = { pending: { l: 'Pendiente', c: accentYellow }, in_review: { l: 'En revisión', c: accent }, approved: { l: 'Aprobado', c: accentGreen }, rejected: { l: 'Rechazado', c: accentRed } }[sol.status] || { l: sol.status, c: textMuted }
+                    return (
+                      <tr key={sol.id} className="row-hover" style={{ borderBottom: `1px solid ${navyBorder}` }}>
+                        <td style={{ padding: '0.75rem 1rem', color: textPrimary, fontSize: '0.85rem', fontWeight: '500' }}>{sol.razon_social}</td>
+                        <td style={{ padding: '0.75rem 1rem' }}><span style={{ fontFamily: fontMono, fontSize: '0.78rem', color: textSecondary, background: 'rgba(255,255,255,0.04)', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>{sol.rfc}</span></td>
+                        <td style={{ padding: '0.75rem 1rem', color: textMuted, fontSize: '0.8rem' }}>{sol.tipo_persona === 'moral' ? 'Moral' : 'Física'}</td>
+                        <td style={{ padding: '0.75rem 1rem', color: textMuted, fontSize: '0.8rem' }}>{sol.giro || '—'}</td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <span style={{ color: sc.c, fontSize: '0.72rem', fontWeight: '600', background: `${sc.c}15`, padding: '0.15rem 0.6rem', borderRadius: '9999px' }}>{sc.l}</span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', color: textMuted, fontSize: '0.75rem' }}>{new Date(sol.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}</td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <button onClick={() => { setListaQuery(sol.razon_social); setListaRfc(sol.rfc); setSection('listas') }}
+                            style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '6px', padding: '0.3rem 0.6rem', fontSize: '0.7rem', color: '#60A5FA', cursor: 'pointer', fontFamily: font }}>
+                            Consultar listas
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ── CONSULTA LISTAS ── */}
+        {section === 'listas' && (
+          <div style={{ padding: '2rem', animation: 'fadeIn 0.2s ease' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h1 style={{ color: textPrimary, fontSize: '1.4rem', fontWeight: '700', margin: '0 0 0.3rem', letterSpacing: '-0.02em' }}>Consulta de Listas Negras</h1>
+              <p style={{ color: textMuted, fontSize: '0.82rem', margin: 0 }}>OFAC SDN · SAT 69-B · ONU · UIF · PEPs · Interpol</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '1.5rem' }}>
+              {/* Form */}
+              <div style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', padding: '1.5rem' }}>
+                <h3 style={{ color: textPrimary, fontSize: '0.9rem', fontWeight: '600', margin: '0 0 1.25rem' }}>Nueva Consulta</h3>
+                <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                  <div>
+                    <label style={{ color: textMuted, fontSize: '0.72rem', fontWeight: '600', letterSpacing: '0.06em', display: 'block', marginBottom: '0.35rem' }}>NOMBRE / RAZÓN SOCIAL *</label>
+                    <input value={listaQuery} onChange={e => setListaQuery(e.target.value)} placeholder="Nombre a consultar..."
+                      style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.65rem 0.9rem', color: textPrimary, fontSize: '0.85rem', fontFamily: font }} />
+                  </div>
+                  <div>
+                    <label style={{ color: textMuted, fontSize: '0.72rem', fontWeight: '600', letterSpacing: '0.06em', display: 'block', marginBottom: '0.35rem' }}>RFC (opcional)</label>
+                    <input value={listaRfc} onChange={e => setListaRfc(e.target.value)} placeholder="RFC..."
+                      style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.65rem 0.9rem', color: textPrimary, fontSize: '0.85rem', fontFamily: fontMono }} />
+                  </div>
+                  <div>
+                    <label style={{ color: textMuted, fontSize: '0.72rem', fontWeight: '600', letterSpacing: '0.06em', display: 'block', marginBottom: '0.5rem' }}>LISTAS A CONSULTAR</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+                      {LISTAS_CONFIG.map(l => (
+                        <label key={l.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', padding: '0.45rem 0.6rem', borderRadius: '6px', background: listaSelected.includes(l.id) ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${listaSelected.includes(l.id) ? 'rgba(59,130,246,0.25)' : navyBorder}` }}>
+                          <input type="checkbox" checked={listaSelected.includes(l.id)} onChange={e => setListaSelected(prev => e.target.checked ? [...prev, l.id] : prev.filter(x => x !== l.id))} style={{ accentColor: accent, width: '13px', height: '13px' }} />
+                          <span style={{ color: listaSelected.includes(l.id) ? '#60A5FA' : textSecondary, fontSize: '0.72rem', fontWeight: '500' }}>{l.nombre}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <button onClick={handleListaSearch} disabled={!listaQuery.trim() || listaSearching}
+                  style={{ width: '100%', background: listaSearching ? 'rgba(59,130,246,0.3)' : accent, color: 'white', border: 'none', borderRadius: '9px', padding: '0.8rem', fontSize: '0.88rem', fontWeight: '600', cursor: listaQuery.trim() ? 'pointer' : 'not-allowed', fontFamily: font, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                  {listaSearching ? <><div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> Consultando...</> : 'Consultar listas'}
+                </button>
+
+                {/* Result */}
+                {listaResult && (
+                  <div style={{ marginTop: '1rem', padding: '1rem', borderRadius: '10px', background: listaResult.resultado === 'limpio' ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${listaResult.resultado === 'limpio' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: listaResult.resultado === 'limpio' ? accentGreen : accentRed }} />
+                      <span style={{ color: listaResult.resultado === 'limpio' ? accentGreen : accentRed, fontSize: '0.85rem', fontWeight: '700' }}>
+                        {listaResult.resultado === 'limpio' ? 'SIN COINCIDENCIAS' : 'ALERTA — REQUIERE REVISIÓN'}
+                      </span>
+                    </div>
+                    <div style={{ color: textMuted, fontSize: '0.72rem' }}>{listaResult.nombre} · {listaResult.listas.length} listas consultadas</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Historial */}
+              <div style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', padding: '1.5rem' }}>
+                <h3 style={{ color: textPrimary, fontSize: '0.9rem', fontWeight: '600', margin: '0 0 1rem' }}>Historial de Consultas</h3>
+                {historialConsultas.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2.5rem', color: textMuted, fontSize: '0.82rem' }}>Sin consultas aún</div>
+                ) : (
+                  <div style={{ display: 'grid', gap: '0.5rem' }}>
+                    {historialConsultas.map((c, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.65rem 0.85rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: `1px solid ${navyBorder}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: c.resultado === 'limpio' ? accentGreen : accentRed, flexShrink: 0 }} />
+                          <div>
+                            <div style={{ color: textPrimary, fontSize: '0.8rem', fontWeight: '500' }}>{c.nombre}</div>
+                            {c.rfc && <div style={{ color: textMuted, fontSize: '0.68rem', fontFamily: fontMono }}>{c.rfc}</div>}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ color: c.resultado === 'limpio' ? accentGreen : accentRed, fontSize: '0.68rem', fontWeight: '700' }}>{c.resultado === 'limpio' ? 'Limpio' : 'Alerta'}</div>
+                          <div style={{ color: textMuted, fontSize: '0.65rem' }}>{new Date(c.fecha).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── REPORTES ── */}
+        {section === 'reportes' && (
+          <div style={{ padding: '2rem', animation: 'fadeIn 0.2s ease' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h1 style={{ color: textPrimary, fontSize: '1.4rem', fontWeight: '700', margin: '0 0 0.3rem', letterSpacing: '-0.02em' }}>Reportes CNBV</h1>
+              <p style={{ color: textMuted, fontSize: '0.82rem', margin: 0 }}>Obligaciones de reporte Art. 58 LRITF — via SHCP/UIF</p>
+            </div>
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              {REPORTES.map(r => (
+                <div key={r.id} style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: r.color, boxShadow: `0 0 8px ${r.color}60`, flexShrink: 0 }} />
+                      <h3 style={{ color: textPrimary, fontSize: '0.95rem', fontWeight: '600', margin: 0 }}>{r.nombre}</h3>
+                      <span style={{ background: 'rgba(255,255,255,0.05)', color: textMuted, fontSize: '0.65rem', fontWeight: '600', padding: '0.15rem 0.55rem', borderRadius: '4px', letterSpacing: '0.06em' }}>{r.freq.toUpperCase()}</span>
+                    </div>
+                    <p style={{ color: textMuted, fontSize: '0.82rem', margin: '0 0 0.75rem', lineHeight: 1.5 }}>{r.desc}</p>
+                    {r.vence && <div style={{ color: textMuted, fontSize: '0.72rem' }}>Próximo vencimiento: <span style={{ color: accentYellow }}>{new Date(r.vence).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end', marginLeft: '1.5rem', flexShrink: 0 }}>
+                    <span style={{ fontSize: '0.72rem', fontWeight: '600', padding: '0.2rem 0.7rem', borderRadius: '9999px',
+                      background: r.status === 'presentado' ? 'rgba(16,185,129,0.1)' : r.status === 'pendiente' ? 'rgba(245,158,11,0.1)' : 'rgba(59,130,246,0.1)',
+                      color: r.status === 'presentado' ? accentGreen : r.status === 'pendiente' ? accentYellow : accent,
+                    }}>{r.status === 'presentado' ? 'Presentado' : r.status === 'pendiente' ? 'Pendiente' : 'Al corriente'}</span>
+                    <button style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '7px', padding: '0.4rem 0.85rem', fontSize: '0.75rem', color: '#60A5FA', cursor: 'pointer', fontFamily: font }}>
+                      Generar reporte
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── MATRIZ ── */}
+        {section === 'matriz' && (
+          <div style={{ padding: '2rem', animation: 'fadeIn 0.2s ease' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h1 style={{ color: textPrimary, fontSize: '1.4rem', fontWeight: '700', margin: '0 0 0.3rem', letterSpacing: '-0.02em' }}>Matriz de Riesgo</h1>
+              <p style={{ color: textMuted, fontSize: '0.82rem', margin: 0 }}>Clasificación de clientes por nivel de riesgo LD/FT</p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+              {(['bajo', 'medio', 'alto'] as RiesgoNivel[]).map(nivel => {
+                const r = RIESGO[nivel]
+                const items = inversionistas.filter(i => i.nivel_riesgo === nivel)
+                return (
+                  <div key={nivel} style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', overflow: 'hidden' }}>
+                    <div style={{ padding: '1rem 1.25rem', borderBottom: `1px solid ${navyBorder}`, background: r.bg, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: r.dot }} />
+                        <span style={{ color: r.color, fontSize: '0.85rem', fontWeight: '700' }}>Riesgo {r.label}</span>
+                      </div>
+                      <span style={{ color: r.color, fontSize: '1.1rem', fontWeight: '700', fontFamily: fontMono }}>{items.length}</span>
+                    </div>
+                    <div style={{ padding: '0.75rem' }}>
+                      {items.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '1.5rem', color: textMuted, fontSize: '0.78rem' }}>Sin clientes</div>
+                      ) : items.map(i => (
+                        <div key={i.id} style={{ padding: '0.5rem 0.6rem', borderRadius: '6px', marginBottom: '0.35rem', background: 'rgba(255,255,255,0.02)' }}>
+                          <div style={{ color: textPrimary, fontSize: '0.8rem', fontWeight: '500' }}>{i.nombre}</div>
+                          <div style={{ color: textMuted, fontSize: '0.68rem', fontFamily: fontMono }}>{i.rfc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <div style={{ marginTop: '1.5rem', background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', padding: '1.25rem' }}>
+              <h3 style={{ color: textPrimary, fontSize: '0.88rem', fontWeight: '600', margin: '0 0 0.75rem' }}>Criterios de clasificación — Enfoque Basado en Riesgo (EBR)</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                {[
+                  { nivel: 'Bajo', color: accentGreen, criterios: ['Persona física con actividad económica verificada', 'Sin operaciones en efectivo', 'No PEP, no en listas', 'País de bajo riesgo (México)'] },
+                  { nivel: 'Medio', color: accentYellow, criterios: ['Persona moral sin historial previo', 'Operaciones en efectivo < umbral', 'País con supervisión AML media', 'Cambios frecuentes en perfil transaccional'] },
+                  { nivel: 'Alto', color: accentRed, criterios: ['PEP o familiar de PEP', 'País de alto riesgo (GAFI)', 'En listas OFAC / ONU / UIF', 'Operaciones en efectivo > $7,500 USD'] },
+                ].map(c => (
+                  <div key={c.nivel} style={{ padding: '0.85rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: `1px solid ${navyBorder}` }}>
+                    <div style={{ color: c.color, fontSize: '0.78rem', fontWeight: '700', marginBottom: '0.6rem' }}>RIESGO {c.nivel.toUpperCase()}</div>
+                    {c.criterios.map((cr, i) => (
+                      <div key={i} style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.3rem' }}>
+                        <span style={{ color: c.color, fontSize: '0.68rem', flexShrink: 0, marginTop: '0.1rem' }}>▸</span>
+                        <span style={{ color: textMuted, fontSize: '0.73rem', lineHeight: 1.4 }}>{cr}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── AUDITORÍA ── */}
+        {section === 'auditoria' && (
+          <div style={{ padding: '2rem', animation: 'fadeIn 0.2s ease' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h1 style={{ color: textPrimary, fontSize: '1.4rem', fontWeight: '700', margin: '0 0 0.3rem', letterSpacing: '-0.02em' }}>Log de Auditoría</h1>
+              <p style={{ color: textMuted, fontSize: '0.82rem', margin: 0 }}>Registro de todas las acciones del Oficial de Cumplimiento — conservación 5 años</p>
+            </div>
+            <div style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', padding: '1.5rem' }}>
+              <div style={{ textAlign: 'center', padding: '3rem', color: textMuted }}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ margin: '0 auto 1rem', display: 'block', opacity: 0.4 }}>
+                  <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <div style={{ fontSize: '0.9rem', fontWeight: '500', marginBottom: '0.4rem', color: textSecondary }}>Log de auditoría en construcción</div>
+                <div style={{ fontSize: '0.78rem' }}>Todas las consultas, reportes y modificaciones serán registradas aquí con timestamp y usuario.</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── MODAL NUEVO INVERSIONISTA ── */}
+      {showAddInv && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', animation: 'fadeIn 0.15s ease' }} onClick={() => setShowAddInv(false)}>
+          <div style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '16px', padding: '2rem', width: '100%', maxWidth: '500px', fontFamily: font }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ color: textPrimary, fontSize: '1rem', fontWeight: '700', margin: 0 }}>Nuevo Inversionista</h2>
+              <button onClick={() => setShowAddInv(false)} style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${navyBorder}`, borderRadius: '6px', width: '28px', height: '28px', cursor: 'pointer', color: textSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: font }}>✕</button>
+            </div>
+            <div style={{ display: 'grid', gap: '0.85rem' }}>
+              {[
+                { label: 'NOMBRE COMPLETO *', key: 'nombre', placeholder: 'Juan García López' },
+                { label: 'RFC *', key: 'rfc', placeholder: 'GALJ900101H01', mono: true },
+                { label: 'EMAIL *', key: 'email', placeholder: 'juan@empresa.com' },
+                { label: 'FUENTE DE RECURSOS', key: 'fuente_recursos', placeholder: 'Ej. Salarios, Negocio propio...' },
+              ].map(f => (
+                <div key={f.key}>
+                  <label style={{ color: textMuted, fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.08em', display: 'block', marginBottom: '0.35rem' }}>{f.label}</label>
+                  <input value={(newInv as Record<string, string>)[f.key] || ''} onChange={e => setNewInv(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder}
+                    style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.65rem 0.9rem', color: textPrimary, fontSize: '0.85rem', fontFamily: f.mono ? fontMono : font }} />
+                </div>
+              ))}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div>
+                  <label style={{ color: textMuted, fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.08em', display: 'block', marginBottom: '0.35rem' }}>TIPO</label>
+                  <select value={newInv.tipo} onChange={e => setNewInv(prev => ({ ...prev, tipo: e.target.value }))}
+                    style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.65rem 0.9rem', color: textPrimary, fontSize: '0.85rem', fontFamily: font }}>
+                    <option value="persona_fisica">Persona Física</option>
+                    <option value="persona_moral">Persona Moral</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ color: textMuted, fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.08em', display: 'block', marginBottom: '0.35rem' }}>PAÍS</label>
+                  <select value={newInv.pais} onChange={e => setNewInv(prev => ({ ...prev, pais: e.target.value }))}
+                    style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.65rem 0.9rem', color: textPrimary, fontSize: '0.85rem', fontFamily: font }}>
+                    <option value="MX">México</option>
+                    <option value="US">Estados Unidos</option>
+                    <option value="CO">Colombia</option>
+                    <option value="OTHER">Otro</option>
+                  </select>
+                </div>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', padding: '0.65rem 0.9rem', borderRadius: '8px', background: newInv.pep ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.02)', border: `1px solid ${newInv.pep ? 'rgba(239,68,68,0.2)' : navyBorder}` }}>
+                <input type="checkbox" checked={newInv.pep} onChange={e => setNewInv(prev => ({ ...prev, pep: e.target.checked }))} style={{ accentColor: accentRed, width: '15px', height: '15px' }} />
+                <div>
+                  <div style={{ color: newInv.pep ? accentRed : textSecondary, fontSize: '0.82rem', fontWeight: '500' }}>Persona Expuesta Políticamente (PEP)</div>
+                  <div style={{ color: textMuted, fontSize: '0.7rem' }}>Cargos públicos, familiares o colaboradores cercanos</div>
+                </div>
+              </label>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '1.5rem' }}>
+              <button onClick={() => setShowAddInv(false)} style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '9px', padding: '0.75rem', fontSize: '0.85rem', color: textSecondary, cursor: 'pointer', fontFamily: font }}>Cancelar</button>
+              <button onClick={handleAddInversionista} disabled={invSaving || !newInv.nombre || !newInv.rfc || !newInv.email}
+                style={{ background: newInv.nombre && newInv.rfc && newInv.email ? accent : 'rgba(59,130,246,0.2)', color: 'white', border: 'none', borderRadius: '9px', padding: '0.75rem', fontSize: '0.85rem', fontWeight: '600', cursor: newInv.nombre && newInv.rfc && newInv.email ? 'pointer' : 'not-allowed', fontFamily: font }}>
+                {invSaving ? 'Guardando...' : 'Registrar inversionista'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
-      <div style={{ padding: '1.25rem' }}>{children}</div>
     </div>
   )
-}
-
-function DRow2({ l, v }: { l: string; v: string }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: `1px solid ${cl.gray50}` }}>
-      <span style={{ color: cl.gray400, fontSize: '0.78rem' }}>{l}</span>
-      <span style={{ color: cl.gray700, fontSize: '0.8rem', fontWeight: '500' }}>{v}</span>
-    </div>
-  )
-}
-
-function Spinner({ large }: { large?: boolean }) {
-  const s = large ? 32 : 14
-  return (
-    <div style={{ width: s, height: s, border: `${large ? 3 : 2}px solid rgba(15,123,244,0.2)`, borderTopColor: '#0F7BF4', borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: large ? '0 auto' : undefined }} />
-  )
-}
-
-const labelStyle: React.CSSProperties = { color: cl.gray600, fontSize: '0.8rem', fontWeight: '600', display: 'block', marginBottom: '0.45rem' }
-const inputStyle: React.CSSProperties = {
-  width: '100%', background: cl.white, border: `1.5px solid ${cl.gray200}`, borderRadius: '10px',
-  padding: '0.75rem 1rem', color: cl.gray800, fontSize: '0.88rem', fontFamily: cl.fontFamily,
-  outline: 'none', boxSizing: 'border-box' as const,
 }
