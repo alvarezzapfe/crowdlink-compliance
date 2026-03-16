@@ -24,19 +24,45 @@ interface ListaConsulta {
 
 // ─── Report types ────────────────────────────────────────────────────────────
 interface ReporteOp {
+  // Campos de referencia (1-6)
   folio: string
+  // Campo 7: localidad
+  localidad: string
+  // Campo 8: tipo instrumento
+  tipo_instrumento: string
+  // Campo 9: tipo operación
+  tipo_operacion: string
+  // Campo 10: número cuenta/contrato
+  num_cuenta: string
+  // Campo 11-12: monto y moneda
+  monto: string
+  moneda: string
+  // Campo 13: fecha operación
   fecha_operacion: string
-  tipo_cliente: string
+  // Campo 14: tipo persona
+  tipo_persona: string
+  // Campo 15: nacionalidad
+  nacionalidad: string
+  // Campo 16: tipo relación
+  tipo_relacion: string
+  // Campos 17-19: nombre y apellidos
   nombre_cliente: string
   apellido_paterno: string
   apellido_materno: string
+  // Campo 20-21: RFC y CURP
   rfc_cliente: string
-  nacionalidad: string
-  tipo_operacion: string
-  monto: string
-  moneda: string
+  curp_cliente: string
+  // Campo 22: fecha nacimiento
+  fecha_nacimiento: string
+  // Campo 23: país
+  pais_cliente: string
+  // Campo 24: actividad económica
+  actividad_economica: string
+  // Campos 35-36: descripción y razón
   descripcion: string
   razon_inusualidad?: string
+  // Relación cliente / tipo
+  tipo_cliente: string
 }
 
 interface ReporteGuardado {
@@ -116,25 +142,103 @@ const NAV = [
 
 // ─── Reportes config ──────────────────────────────────────────────────────────
 
-const TIPO_OP = [
-  { v: '01', l: 'Depósito en efectivo' },
-  { v: '02', l: 'Retiro en efectivo' },
-  { v: '03', l: 'Transferencia recibida' },
-  { v: '04', l: 'Transferencia enviada' },
-  { v: '05', l: 'Compra de divisas' },
-  { v: '06', l: 'Venta de divisas' },
-  { v: '07', l: 'Financiamiento colectivo — inversión' },
-  { v: '08', l: 'Financiamiento colectivo — solicitud' },
-  { v: '09', l: 'Pago de crédito' },
-  { v: '10', l: 'Otro' },
+// ─── Catálogos CNBV/UIF layout ITF (DOF 24/03/2020 + Res. UIF 22/04/2021) ──────
+const CAT_TIPO_OP = [
+  { v: '01', l: '01 — Depósito en efectivo MN' },
+  { v: '02', l: '02 — Retiro en efectivo MN' },
+  { v: '03', l: '03 — Depósito en efectivo ME' },
+  { v: '04', l: '04 — Retiro en efectivo ME' },
+  { v: '05', l: '05 — Transferencia / traspaso recibido' },
+  { v: '06', l: '06 — Transferencia / traspaso enviado' },
+  { v: '07', l: '07 — Transferencia internacional recibida' },
+  { v: '08', l: '08 — Transferencia internacional enviada' },
+  { v: '09', l: '09 — Compra de divisas' },
+  { v: '10', l: '10 — Venta de divisas' },
+  { v: '11', l: '11 — Compra de activos virtuales' },
+  { v: '12', l: '12 — Venta de activos virtuales' },
+  { v: '13', l: '13 — Financiamiento colectivo — inversión recibida' },
+  { v: '14', l: '14 — Financiamiento colectivo — financiamiento otorgado' },
+  { v: '15', l: '15 — Pago de financiamiento colectivo' },
+  { v: '16', l: '16 — Rendimientos / intereses pagados' },
+  { v: '17', l: '17 — Comisiones cobradas' },
+  { v: '99', l: '99 — Otro' },
 ]
 
-const MONEDAS = [
-  { v: 'MXP', l: 'Peso mexicano (MXP)' },
-  { v: 'USD', l: 'Dólar americano (USD)' },
-  { v: 'EUR', l: 'Euro (EUR)' },
-  { v: 'USDT', l: 'USDT (activo virtual)' },
+const CAT_TIPO_INSTRUMENTO = [
+  { v: '01', l: '01 — Cuenta de depósito a la vista' },
+  { v: '02', l: '02 — Cuenta de ahorro' },
+  { v: '03', l: '03 — Tarjeta de débito' },
+  { v: '04', l: '04 — Tarjeta de crédito' },
+  { v: '05', l: '05 — Crédito personal' },
+  { v: '06', l: '06 — Crédito hipotecario' },
+  { v: '07', l: '07 — Crédito automotriz' },
+  { v: '08', l: '08 — Crédito empresarial' },
+  { v: '20', l: '20 — Cuenta / contrato IFC (financiamiento colectivo)' },
+  { v: '21', l: '21 — Instrumento de deuda colectivo' },
+  { v: '22', l: '22 — Instrumento de capital colectivo' },
+  { v: '23', l: '23 — Cartera de activos virtuales' },
+  { v: '24', l: '24 — Fondo de pago electrónico' },
+  { v: '99', l: '99 — Otro instrumento financiero' },
 ]
+
+const CAT_TIPO_RELACION = [
+  { v: '01', l: '01 — Cliente / inversionista' },
+  { v: '02', l: '02 — Usuario' },
+  { v: '03', l: '03 — Solicitante de financiamiento' },
+  { v: '04', l: '04 — Empleado / funcionario' },
+  { v: '05', l: '05 — Consejero / directivo' },
+  { v: '06', l: '06 — Accionista / socio' },
+  { v: '07', l: '07 — Apoderado legal' },
+  { v: '08', l: '08 — Beneficiario' },
+  { v: '09', l: '09 — Prospecto' },
+  { v: '10', l: '10 — Persona relacionada' },
+]
+
+const CAT_MONEDA = [
+  { v: 'MXP', l: 'MXP — Peso mexicano' },
+  { v: 'USD', l: 'USD — Dólar americano' },
+  { v: 'EUR', l: 'EUR — Euro' },
+  { v: 'GBP', l: 'GBP — Libra esterlina' },
+  { v: 'CAD', l: 'CAD — Dólar canadiense' },
+  { v: 'JPY', l: 'JPY — Yen japonés' },
+  { v: 'CHF', l: 'CHF — Franco suizo' },
+  { v: 'BTC', l: 'BTC — Bitcoin (activo virtual)' },
+  { v: 'ETH', l: 'ETH — Ethereum (activo virtual)' },
+  { v: 'USDT', l: 'USDT — Tether (activo virtual)' },
+]
+
+const CAT_PAIS = [
+  { v: 'MEX', l: 'MEX — México' },
+  { v: 'USA', l: 'USA — Estados Unidos' },
+  { v: 'COL', l: 'COL — Colombia' },
+  { v: 'ARG', l: 'ARG — Argentina' },
+  { v: 'BRA', l: 'BRA — Brasil' },
+  { v: 'CHL', l: 'CHL — Chile' },
+  { v: 'PER', l: 'PER — Perú' },
+  { v: 'ESP', l: 'ESP — España' },
+  { v: 'CAN', l: 'CAN — Canadá' },
+  { v: 'GBR', l: 'GBR — Reino Unido' },
+  { v: 'CHN', l: 'CHN — China' },
+  { v: 'OTR', l: 'OTR — Otro' },
+]
+
+const CAT_LOCALIDAD = [
+  { v: '09000001', l: '09000001 — Ciudad de México' },
+  { v: '15000001', l: '15000001 — Estado de México' },
+  { v: '19000001', l: '19000001 — Nuevo León' },
+  { v: '14000001', l: '14000001 — Jalisco' },
+  { v: '21000001', l: '21000001 — Puebla' },
+  { v: '30000001', l: '30000001 — Veracruz' },
+  { v: '25000001', l: '25000001 — Sinaloa' },
+  { v: '06000001', l: '06000001 — Colima' },
+  { v: '11000001', l: '11000001 — Guanajuato' },
+  { v: '24000001', l: '24000001 — San Luis Potosí' },
+  { v: '99000000', l: '99000000 — Otra / No aplica' },
+]
+
+// Backward compat alias
+const TIPO_OP = CAT_TIPO_OP
+const MONEDAS = CAT_MONEDA
 
 const CASFIM_ENTIDAD = '0065022' // 065-022 → sin guión, con 0 al inicio
 const CASFIM_SUPERVISOR = '004000' // CNBV
@@ -1229,16 +1333,47 @@ export default function PldPage() {
                     </label>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${navyBorder}`, borderRadius: '10px', padding: '1.25rem', marginBottom: '1rem' }}>
+                    {/* Section labels */}
+                    <div style={{ gridColumn:'1/-1', color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.08em', borderBottom: `1px solid ${navyBorder}`, paddingBottom: '0.4rem', marginBottom: '0.1rem' }}>OPERACIÓN</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
                       {([
-                        {label:'FECHA OPERACIÓN',key:'fecha_operacion',type:'date',mono:true},
-                        {label:'TIPO OPERACIÓN',key:'tipo_operacion',type:'select',opts:TIPO_OP},
-                        {label:'NOMBRE / RAZÓN SOCIAL',key:'nombre_cliente',placeholder:'Nombre completo'},
-                        {label:'RFC',key:'rfc_cliente',placeholder:'RFC',mono:true},
-                        {label:'MONTO',key:'monto',placeholder:'0.00',mono:true},
-                        {label:'MONEDA',key:'moneda',type:'select',opts:MONEDAS},
-                        {label:'NACIONALIDAD (1=MX 2=EXT)',key:'nacionalidad',placeholder:'1',mono:true},
-                        {label:'TIPO CLIENTE',key:'tipo_cliente',type:'select',opts:[{v:'1',l:'Inversionista'},{v:'2',l:'Solicitante'},{v:'3',l:'Relacionado'}]},
+                        {label:'C13 — FECHA OPERACIÓN',key:'fecha_operacion',type:'date',mono:true},
+                        {label:'C9 — TIPO DE OPERACIÓN',key:'tipo_operacion',type:'select',opts:CAT_TIPO_OP},
+                        {label:'C8 — TIPO INSTRUMENTO',key:'tipo_instrumento',type:'select',opts:CAT_TIPO_INSTRUMENTO},
+                        {label:'C10 — NO. CUENTA / CONTRATO',key:'num_cuenta',placeholder:'ID cuenta en Crowdlink',mono:true},
+                        {label:'C11 — MONTO',key:'monto',placeholder:'0.00',mono:true},
+                        {label:'C12 — MONEDA',key:'moneda',type:'select',opts:CAT_MONEDA},
+                        {label:'C7 — LOCALIDAD',key:'localidad',type:'select',opts:CAT_LOCALIDAD},
+                      ] as {label:string,key:string,type?:string,placeholder?:string,mono?:boolean,opts?:{v:string,l:string}[]}[]).map(f => (
+                        <div key={f.key}>
+                          <label style={{ color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.06em', display: 'block', marginBottom: '0.25rem' }}>{f.label}</label>
+                          {f.type === 'select' ? (
+                            <select value={(reporteCurrentOp as Record<string,string>)[f.key]||''} onChange={e => setReporteCurrentOp(p=>({...p,[f.key]:e.target.value}))} style={{ width:'100%', background:'rgba(255,255,255,0.04)', border:`1px solid ${navyBorder}`, borderRadius:'7px', padding:'0.5rem 0.7rem', color:textPrimary, fontSize:'0.8rem', fontFamily:font }}>
+                              <option value="">Seleccionar...</option>
+                              {f.opts!.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+                            </select>
+                          ) : (
+                            <input type={f.type||'text'} value={(reporteCurrentOp as Record<string,string>)[f.key]||''} onChange={e => setReporteCurrentOp(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder} style={{ width:'100%', background:'rgba(255,255,255,0.04)', border:`1px solid ${navyBorder}`, borderRadius:'7px', padding:'0.5rem 0.7rem', color:textPrimary, fontSize:'0.8rem', fontFamily:f.mono?fontMono:font }} />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Persona fields */}
+                    <div style={{ gridColumn:'1/-1', color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.08em', borderBottom: `1px solid ${navyBorder}`, paddingBottom: '0.4rem', marginTop: '0.75rem', marginBottom: '0.1rem' }}>SUJETO REPORTADO</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                      {([
+                        {label:'C14 — TIPO PERSONA',key:'tipo_persona',type:'select',opts:[{v:'1',l:'1 — Persona física'},{v:'2',l:'2 — Persona moral'}]},
+                        {label:'C16 — TIPO RELACIÓN',key:'tipo_relacion',type:'select',opts:CAT_TIPO_RELACION},
+                        {label:'C15 — NACIONALIDAD',key:'nacionalidad',type:'select',opts:[{v:'1',l:'1 — Mexicana'},{v:'2',l:'2 — Extranjera'}]},
+                        {label:'C23 — PAÍS (ISO 3166)',key:'pais_cliente',type:'select',opts:CAT_PAIS},
+                        {label:'C17 — NOMBRE / RAZÓN SOCIAL',key:'nombre_cliente',placeholder:'Nombre(s) o razón social'},
+                        {label:'C18 — APELLIDO PATERNO',key:'apellido_paterno',placeholder:'Requerido persona física'},
+                        {label:'C19 — APELLIDO MATERNO',key:'apellido_materno',placeholder:'XXXX si no tiene'},
+                        {label:'C20 — RFC',key:'rfc_cliente',placeholder:'12 moral / 13 física',mono:true},
+                        {label:'C21 — CURP',key:'curp_cliente',placeholder:'18 chars — persona física',mono:true},
+                        {label:'C22 — FECHA NACIMIENTO',key:'fecha_nacimiento',type:'date',mono:true},
+                        {label:'C24 — ACTIVIDAD ECONÓMICA',key:'actividad_economica',placeholder:'Clave SCIAN (opc.)'},
                       ] as {label:string,key:string,type?:string,placeholder?:string,mono?:boolean,opts?:{v:string,l:string}[]}[]).map(f => (
                         <div key={f.key}>
                           <label style={{ color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.06em', display: 'block', marginBottom: '0.25rem' }}>{f.label}</label>
@@ -1338,25 +1473,39 @@ export default function PldPage() {
                         const periodo = (document.getElementById('reporte-periodo') as HTMLInputElement)?.value?.replace('-','') || new Date().toISOString().slice(0,7).replace('-','')
                         // Layout oficial CNBV/UIF: separador ";", mayúsculas
                         // Período: AAAAMM para Relevantes, AAAAMMDD para Inusuales/Preocupantes
+                        // Layout CNBV/UIF ITF — separador ; — MAYÚSCULAS — DOF 24/03/2020 + Res. UIF 22/04/2021
                         const lines = reporteOps.map((op,i) => {
-                          const fechaOp = op.fecha_operacion?.replace(/-/g,'') || ''
-                          const periodoField = reporteTipo === '1' ? periodo : fechaOp // AAAAMM o AAAAMMDD
+                          const fechaOp = (op.fecha_operacion||'').replace(/-/g,'') // AAAAMMDD
+                          const periodoField = reporteTipo === '1' ? periodo : fechaOp
+                          const clean = (s: string) => (s||'').toUpperCase().replace(/;/g,',').substring(0, 40)
+                          const cleanLong = (s: string) => (s||'').toUpperCase().replace(/;/g,',').substring(0, 1000)
                           return [
-                            reporteTipo,           // Campo 1: Tipo
-                            periodoField,          // Campo 2: Período
-                            String(i+1).padStart(6,'0'), // Campo 3: Folio/Consecutivo
-                            CASFIM_SUPERVISOR,     // Campo 4: Órgano supervisor
-                            CASFIM_ENTIDAD,        // Campo 5: Clave entidad
-                            '0',                   // Campo 6: Sucursal
-                            fechaOp,               // Campo 7/13: Fecha operación AAAAMMDD
-                            op.tipo_operacion||'07', // Campo 8/9: Tipo operación
-                            (op.nombre_cliente||'').toUpperCase(), // Campo: Nombre
-                            (op.rfc_cliente||'').toUpperCase(),    // Campo: RFC
-                            op.monto||'0',         // Campo 11: Monto
-                            op.moneda||'MXP',      // Campo: Moneda
-                            op.nacionalidad||'1',  // Campo 15: Nacionalidad
-                            (op.descripcion||'').toUpperCase().replace(/;/g,','), // Campo 35: Descripción
-                            (op.razon_inusualidad||'').toUpperCase().replace(/;/g,','), // Campo 36: Razón inusualidad
+                            reporteTipo,                                    // C1: Tipo reporte
+                            periodoField,                                   // C2: Período
+                            String(i+1).padStart(6,'0'),                    // C3: Folio consecutivo
+                            CASFIM_SUPERVISOR,                              // C4: Órgano supervisor CNBV
+                            CASFIM_ENTIDAD,                                 // C5: Clave entidad CASFIM
+                            (op.localidad||'99000000').substring(0,8),      // C6/7: Sucursal/Localidad
+                            op.tipo_instrumento||'20',                      // C8: Tipo instrumento
+                            op.tipo_operacion||'13',                        // C9: Tipo operación
+                            (op.num_cuenta||'').substring(0,16).toUpperCase(), // C10: Número cuenta
+                            op.monto||'0',                                  // C11: Monto
+                            op.moneda||'MXP',                               // C12: Moneda
+                            fechaOp,                                        // C13: Fecha operación AAAAMMDD
+                            op.tipo_persona||'1',                           // C14: Tipo persona
+                            op.nacionalidad||'1',                           // C15: Nacionalidad
+                            op.tipo_relacion||'01',                         // C16: Tipo relación
+                            clean(op.nombre_cliente||''),                   // C17: Nombre/Razón social
+                            clean(op.apellido_paterno||''),                 // C18: Apellido paterno
+                            clean(op.apellido_materno||'XXXX'),             // C19: Apellido materno
+                            (op.rfc_cliente||'').toUpperCase().substring(0,13), // C20: RFC
+                            (op.curp_cliente||'').toUpperCase().substring(0,18), // C21: CURP
+                            (op.fecha_nacimiento||'').replace(/-/g,''),     // C22: Fecha nacimiento AAAAMMDD
+                            op.pais_cliente||'MEX',                         // C23: País ISO 3166
+                            op.actividad_economica||'',                     // C24: Actividad económica SCIAN
+                            '00',                                           // C29: Consecutivo relacionados
+                            cleanLong(op.descripcion||''),                  // C35: Descripción operación
+                            reporteTipo!=='1' ? cleanLong(op.razon_inusualidad||'') : '', // C36: Razón inusualidad
                           ].join(';')
                         }).join('\n')
                         const blob = new Blob([lines],{type:'text/plain;charset=utf-8'})
