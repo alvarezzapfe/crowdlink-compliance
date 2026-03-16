@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase-client'
 import { cl } from '@/lib/design'
 import { IconCheck, IconZap, IconDoc, IconUser, IconBuilding, IconCreditCard, IconEye, IconEyeOff, IconLock, IconInfo, IconX } from '@/components/Icons'
@@ -18,7 +19,7 @@ interface DocFile { file: File | null; url: string; uploading: boolean; error: s
 const emptyDoc = (): DocFile => ({ file: null, url: '', uploading: false, error: '' })
 
 interface Form {
-  razon_social: string; rfc: string; tipo_persona: 'moral' | 'fisica'; giro: string; pais: string
+  razon_social: string; tipo_societario: string; rfc: string; tipo_persona: 'moral' | 'fisica'; giro: string; pais: string
   rep_legal_nombre: string; rep_legal_curp: string
   nivel_facturacion: string; num_empleados: string; antiguedad: string
   fuente_recursos: string; pais_origen_recursos: string; opera_en_efectivo: string
@@ -45,13 +46,11 @@ const FUENTE_OPTS = [
 ]
 
 export default function KycWizardPage() {
-  const [locked, setLocked] = useState(false)
-  useEffect(() => {
-    setLocked(new URLSearchParams(window.location.search).get('locked') === '1')
-  }, [])
+  const searchParams = useSearchParams()
+  const locked = searchParams.get('locked') === '1'
   const [step, setStep] = useState(1)
   const [form, setForm] = useState<Form>({
-    razon_social: '', rfc: '', tipo_persona: 'moral', giro: '', pais: 'MX',
+    razon_social: '', tipo_societario: '', rfc: '', tipo_persona: 'moral', giro: '', pais: 'MX',
     rep_legal_nombre: '', rep_legal_curp: '',
     nivel_facturacion: '', num_empleados: '', antiguedad: '',
     fuente_recursos: '', pais_origen_recursos: 'MX', opera_en_efectivo: 'no',
@@ -157,7 +156,7 @@ export default function KycWizardPage() {
         const res = await fetch('/api/v1/kyc/empresas/public', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ razon_social: form.razon_social, rfc: form.rfc, tipo_persona: form.tipo_persona, giro: form.giro, pais: form.pais, rep_legal_nombre: form.rep_legal_nombre, rep_legal_curp: form.rep_legal_curp, acta_constitutiva_url: docs.acta.url || null, comprobante_domicilio_url: docs.domicilio.url || null, identificacion_rep_url: docs.identificacion.url || null, status: 'pending', metadata: { financiero: { nivel_facturacion: form.nivel_facturacion, num_empleados: form.num_empleados, antiguedad: form.antiguedad, fuente_recursos: form.fuente_recursos, pais_origen_recursos: form.pais_origen_recursos, opera_en_efectivo: form.opera_en_efectivo }, ekatena_conectado: ekatenaStatus === 'connected', ekatena_autenticado: ekatenaStatus === 'connected', ekatena_rfc: form.ekatena_rfc || form.rfc } }),
+          body: JSON.stringify({ razon_social: form.razon_social + (form.tipo_societario && form.tipo_societario !== 'Otro' ? ' ' + form.tipo_societario : ''), rfc: form.rfc, tipo_persona: form.tipo_persona, giro: form.giro, pais: form.pais, rep_legal_nombre: form.rep_legal_nombre, rep_legal_curp: form.rep_legal_curp, acta_constitutiva_url: docs.acta.url || null, comprobante_domicilio_url: docs.domicilio.url || null, identificacion_rep_url: docs.identificacion.url || null, status: 'pending', metadata: { financiero: { nivel_facturacion: form.nivel_facturacion, num_empleados: form.num_empleados, antiguedad: form.antiguedad, fuente_recursos: form.fuente_recursos, pais_origen_recursos: form.pais_origen_recursos, opera_en_efectivo: form.opera_en_efectivo }, ekatena_conectado: ekatenaStatus === 'connected', ekatena_autenticado: ekatenaStatus === 'connected', ekatena_rfc: form.ekatena_rfc || form.rfc } }),
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Error')
@@ -262,8 +261,36 @@ export default function KycWizardPage() {
             {step === 1 && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
                 <div style={{ gridColumn: '1/-1' }}>
-                  <FL>Razón Social *</FL>
-                  <FI placeholder="Empresa SA de CV" value={form.razon_social} onChange={v => up('razon_social', v)} err={errors.razon_social} autoFocus />
+                  <FL>Razón Social * <span style={{ color: cl.gray400, fontSize: '0.68rem', fontWeight: '400' }}>máx. 60 caracteres</span></FL>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      autoFocus
+                      placeholder="PELUCHE"
+                      value={form.razon_social}
+                      maxLength={60}
+                      onChange={e => {
+                        // Allow letters, numbers, spaces and common corp chars
+                        const val = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚüÜñÑ0-9 .,'&()-]/g, '').toUpperCase()
+                        up('razon_social', val)
+                      }}
+                      style={{ ...inputBase, borderColor: errors.razon_social ? '#FCA5A5' : undefined, paddingRight: '3.5rem' }}
+                    />
+                    <span style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.68rem', color: form.razon_social.length > 50 ? '#F59E0B' : cl.gray400 }}>
+                      {form.razon_social.length}/60
+                    </span>
+                  </div>
+                  {errors.razon_social && <div style={{ color: '#DC2626', fontSize: '0.72rem', marginTop: '0.25rem' }}>{errors.razon_social}</div>}
+                </div>
+                <div style={{ gridColumn: '1/-1' }}>
+                  <FL>Tipo Societario</FL>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.4rem' }}>
+                    {['S.A. de C.V.', 'S.A.P.I. de C.V.', 'S. de R.L.', 'S.C.', 'Otro'].map(t => (
+                      <button key={t} onClick={() => up('tipo_societario', form.tipo_societario === t ? '' : t)}
+                        style={{ padding: '0.55rem 0.25rem', borderRadius: '8px', cursor: 'pointer', border: form.tipo_societario === t ? '2px solid #0F7BF4' : `1.5px solid ${cl.gray200}`, background: form.tipo_societario === t ? '#EBF3FF' : cl.white, color: form.tipo_societario === t ? '#0F7BF4' : cl.gray500, fontSize: '0.72rem', fontWeight: form.tipo_societario === t ? '700' : '400', fontFamily: cl.fontFamily, textAlign: 'center', lineHeight: 1.3 }}>
+                        {t}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <FL>Tipo de Persona *</FL>
@@ -467,7 +494,7 @@ export default function KycWizardPage() {
                 <div style={{ border: `1px solid ${cl.gray200}`, borderRadius: '12px', overflow: 'hidden', marginBottom: '1rem' }}>
                   {[
                     { group: 'EMPRESA', rows: [
-                      { l: 'Razón Social', v: form.razon_social },
+                      { l: 'Razón Social', v: form.razon_social + (form.tipo_societario && form.tipo_societario !== 'Otro' ? ' ' + form.tipo_societario : '') },
                       { l: 'RFC', v: form.rfc, mono: true },
                       { l: 'Tipo', v: form.tipo_persona === 'moral' ? 'Persona Moral' : 'Persona Física' },
                       { l: 'Giro', v: form.giro || '—' },
