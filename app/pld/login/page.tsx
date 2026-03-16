@@ -111,6 +111,9 @@ export default function PldLoginPage() {
                 <button onClick={handleCredentials} disabled={loading || !email || !password} style={{ width: '100%', background: loading || !email || !password ? '#E2E8F0' : '#059669', border: 'none', borderRadius: '10px', padding: '0.85rem', color: loading || !email || !password ? '#94A3B8' : 'white', cursor: loading || !email || !password ? 'not-allowed' : 'pointer', fontFamily: cl.fontFamily, fontSize: '0.9rem', fontWeight: '700', boxShadow: loading || !email || !password ? 'none' : '0 4px 12px rgba(5,150,105,0.25)' }}>
                   {loading ? 'Verificando...' : 'Continuar →'}
                 </button>
+                <div style={{ textAlign: 'center' }}>
+                  <a href="/reset-password" style={{ color: '#94A3B8', fontSize: '0.8rem', textDecoration: 'none' }}>Olvidé mi contraseña</a>
+                </div>
               </div>
             )}
 
