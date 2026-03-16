@@ -71,36 +71,78 @@ function buildEmailHTML({ nombre_empresa, invite_url }: { nombre_empresa: string
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#F8FAFC;font-family:system-ui,sans-serif;">
+<body style="margin:0;padding:0;background:#F1F5F9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
     <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;border:1px solid #E2E8F0;overflow:hidden;">
-        <tr><td style="background:linear-gradient(135deg,#0F7BF4,#3DFFA0);padding:28px 32px;">
-          <div style="font-size:20px;font-weight:700;color:white;">crowdlink</div>
-          <div style="font-size:12px;color:rgba(255,255,255,0.8);margin-top:2px;">Compliance Hub</div>
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:20px;border:1px solid #E2E8F0;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
+
+        <!-- HEADER -->
+        <tr><td style="background:linear-gradient(135deg,#0F7BF4 0%,#00C98A 100%);padding:32px 40px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td>
+                <img src="https://crowdlink-compliance.vercel.app/crowdlink-logo.png" alt="crowdlink" height="28" style="display:block;" />
+                <div style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:6px;letter-spacing:0.05em;">COMPLIANCE HUB</div>
+              </td>
+              <td align="right">
+                <div style="background:rgba(255,255,255,0.2);border-radius:8px;padding:6px 12px;display:inline-block;">
+                  <span style="color:white;font-size:11px;font-weight:600;">KYC Verification</span>
+                </div>
+              </td>
+            </tr>
+          </table>
         </td></tr>
-        <tr><td style="padding:36px 40px 28px;">
-          <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#0F172A;">
+
+        <!-- BODY -->
+        <tr><td style="padding:40px 40px 32px;">
+          <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#0F172A;letter-spacing:-0.02em;">
             ${nombre_empresa ? nombre_empresa + ', completa' : 'Completa'} tu registro KYC
           </h1>
-          <p style="margin:0 0 28px;font-size:15px;color:#475569;line-height:1.6;">
-            Crowdlink te invita a completar el proceso de verificación de identidad requerido para operar en la plataforma.
+          <p style="margin:0 0 32px;font-size:15px;color:#475569;line-height:1.7;">
+            Crowdlink te invita a completar el proceso de verificación de identidad requerido para operar en la plataforma. El proceso toma aproximadamente 10 minutos.
           </p>
-          <div style="text-align:center;margin-bottom:28px;">
-            <a href="${invite_url}" style="display:inline-block;background:#0F7BF4;color:white;text-decoration:none;padding:14px 36px;border-radius:10px;font-size:15px;font-weight:600;">
-              Completar verificación KYC →
-            </a>
-          </div>
-          <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:14px 18px;">
-            <div style="font-size:11px;color:#94A3B8;margin-bottom:5px;font-weight:600;">LINK DIRECTO</div>
-            <div style="font-size:12px;color:#475569;word-break:break-all;font-family:monospace;">${invite_url}</div>
+
+          <!-- CTA -->
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+            <tr><td align="center">
+              <a href="${invite_url}" style="display:inline-block;background:#0F7BF4;color:white;text-decoration:none;padding:16px 40px;border-radius:12px;font-size:16px;font-weight:700;letter-spacing:-0.01em;">
+                Completar verificación KYC →
+              </a>
+            </td></tr>
+          </table>
+
+          <!-- INFO BADGES -->
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+            <tr>
+              <td width="48%" style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:14px 18px;text-align:center;">
+                <div style="font-size:10px;font-weight:700;color:#92400E;letter-spacing:0.08em;margin-bottom:4px;">VIGENCIA</div>
+                <div style="font-size:15px;font-weight:700;color:#B45309;">72 horas</div>
+              </td>
+              <td width="4%"></td>
+              <td width="48%" style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:14px 18px;text-align:center;">
+                <div style="font-size:10px;font-weight:700;color:#1D4ED8;letter-spacing:0.08em;margin-bottom:4px;">USO</div>
+                <div style="font-size:15px;font-weight:700;color:#1D4ED8;">Un solo acceso</div>
+              </td>
+            </tr>
+          </table>
+
+          <!-- LINK DIRECTO -->
+          <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:16px 18px;">
+            <div style="font-size:10px;color:#94A3B8;margin-bottom:6px;font-weight:700;letter-spacing:0.08em;">LINK DIRECTO</div>
+            <div style="font-size:12px;color:#475569;word-break:break-all;font-family:'Courier New',monospace;line-height:1.5;">${invite_url}</div>
           </div>
         </td></tr>
-        <tr><td style="background:#F8FAFC;border-top:1px solid #E2E8F0;padding:18px 40px;text-align:center;">
-          <p style="margin:0;font-size:12px;color:#94A3B8;">
+
+        <!-- FOOTER -->
+        <tr><td style="background:#F8FAFC;border-top:1px solid #E2E8F0;padding:20px 40px;">
+          <p style="margin:0 0 4px;font-size:12px;color:#94A3B8;text-align:center;">
+            Link personal e intransferible. Si no solicitaste este acceso, ignora este mensaje.
+          </p>
+          <p style="margin:0;font-size:11px;color:#CBD5E1;text-align:center;">
             PorCuanto S.A. de C.V. · IFC · CNBV · LFPDPPP
           </p>
         </td></tr>
+
       </table>
     </td></tr>
   </table>
