@@ -312,8 +312,8 @@ export default function PldPage() {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionToken },
       body: JSON.stringify({ id, status })
     })
-    setAuditorias(p => p.map(a => ({ ...a, pld_auditoria_hallazgos: a.pld_auditoria_hallazgos?.map(h => h.id === id ? { ...h, status } : h) })))
-    setSelectedAuditoria(prev => prev ? { ...prev, pld_auditoria_hallazgos: prev.pld_auditoria_hallazgos?.map(h => h.id === id ? { ...h, status } : h) } : prev)
+    setAuditorias(p => p.map(a => ({ ...a, pld_auditoria_hallazgos: a.pld_auditoria_hallazgos?.map(h => h.id === id ? { ...h, status: status as Hallazgo['status'] } : h) })) as Auditoria[])
+    setSelectedAuditoria(prev => prev ? { ...prev, pld_auditoria_hallazgos: prev.pld_auditoria_hallazgos?.map(h => h.id === id ? { ...h, status: status as Hallazgo['status'] } : h) } : prev)
   }
 
   const handleListaSearch = async () => {
