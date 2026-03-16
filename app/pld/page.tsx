@@ -56,10 +56,11 @@ const NAV = [
 
 // ─── Reportes config ──────────────────────────────────────────────────────────
 const REPORTES = [
-  { id: 'R01', nombre: 'R01 — Operaciones Relevantes', freq: 'Mensual', desc: 'Operaciones ≥ $7,500 USD o equivalente. Plazo: 10 días hábiles del mes siguiente.', color: accent, status: 'pendiente', vence: '2026-04-10' },
-  { id: 'R10', nombre: 'R10 — Operaciones Inusuales', freq: 'Cuando proceda', desc: 'Operaciones que no concuerdan con el perfil transaccional del cliente.', color: accentYellow, status: 'al_corriente', vence: null },
-  { id: 'R27', nombre: 'R27 — Ops. Internas Preocupantes', freq: '24 horas', desc: 'Conductas de directivos o empleados que puedan actualizar supuestos de LD/FT.', color: accentRed, status: 'al_corriente', vence: null },
-  { id: 'IFT24', nombre: 'IFT-24 — Informe Semestral', freq: 'Semestral', desc: 'Informe de cumplimiento del Oficial ante el Consejo de Administración.', color: accentGreen, status: 'presentado', vence: '2026-07-31' },
+  { id: 'Art. 66', nombre: 'Art. 66 — Operaciones Relevantes', freq: 'Trimestral', desc: 'Operaciones ≥ umbral UIF. Envío vía SITI dentro de los primeros 10 días hábiles de ene, abr, jul y oct. Base: Art. 66 Disp. Art. 58 LRITF.', color: accent, status: 'pendiente', vence: '2026-04-14' },
+  { id: 'Art. 69', nombre: 'Art. 69 — Operaciones Inusuales', freq: '3 días hábiles', desc: 'Operaciones que no concuerdan con el perfil transaccional del cliente o carezcan de justificación económica. Plazo: 3 días hábiles desde dictaminación.', color: accentYellow, status: 'al_corriente', vence: null },
+  { id: 'Art. 75', nombre: 'Art. 75 — Ops. Internas Preocupantes', freq: '3 días hábiles', desc: 'Conductas de directivos, funcionarios o empleados que puedan actualizar supuestos de LD/FT. Plazo: 3 días hábiles desde conocimiento.', color: accentRed, status: 'al_corriente', vence: null },
+  { id: 'Art. 48', nombre: 'Art. 48 — Oficial de Cumplimiento', freq: 'Al designar / anual', desc: 'Notificación de designación o sustitución del Oficial de Cumplimiento ante CNBV vía SITI PLD/FT. Certificación CNBV vigente obligatoria.', color: accentGreen, status: 'presentado', vence: null },
+  { id: 'Art. 53', nombre: 'Art. 53 — Comité CCC', freq: 'Al constituir', desc: 'Notificación de integración del Comité de Comunicación y Control (CCC). Órgano colegiado obligatorio para ITF. Vía SITI CNBV.', color: '#A78BFA', status: 'presentado', vence: null },
 ]
 
 const LISTAS_CONFIG = [
@@ -678,7 +679,7 @@ export default function PldPage() {
               ].map(f => (
                 <div key={f.key}>
                   <label style={{ color: textMuted, fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.08em', display: 'block', marginBottom: '0.35rem' }}>{f.label}</label>
-                  <input value={String((newInv as Record<string, unknown>)[f.key] || '')} onChange={e => setNewInv(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder}
+                  <input value={(newInv as Record<string, string>)[f.key] || ''} onChange={e => setNewInv(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder}
                     style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.65rem 0.9rem', color: textPrimary, fontSize: '0.85rem', fontFamily: f.mono ? fontMono : font }} />
                 </div>
               ))}
