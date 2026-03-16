@@ -111,26 +111,5 @@ export async function POST(req: NextRequest) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const invite_url = `${baseUrl}/invite/${inv.token}`
 
-  // Send email via Resend if configured
-  let email_sent = false
-  if (process.env.RESEND_API_KEY) {
-    try {
-      const emailRes = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
-          to: [email],
-          subject: `${nombre_empresa ? nombre_empresa + ' — ' : ''}Invitación KYC Crowdlink`,
-          html: buildEmailHTML({ nombre_empresa, invite_url }),
-        }),
-      })
-      email_sent = emailRes.ok
-    } catch { email_sent = false }
-  }
-
-  return NextResponse.json({ invitation: inv, invite_url, email_sent })
+  return NextResponse.json({ invitation: inv, invite_url })
 }
