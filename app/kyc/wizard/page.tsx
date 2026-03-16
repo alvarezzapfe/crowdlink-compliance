@@ -22,7 +22,7 @@ interface Form {
   rep_legal_nombre: string; rep_legal_curp: string
   nivel_facturacion: string; num_empleados: string; antiguedad: string
   fuente_recursos: string; pais_origen_recursos: string; opera_en_efectivo: string
-  ekatena_rfc: string; ekatena_ciec: string
+  ekatena_rfc: string; ekatena_ciec: string; giro_custom: string
 }
 
 const FACTURACION_OPTS = [
@@ -55,7 +55,7 @@ export default function KycWizardPage() {
     rep_legal_nombre: '', rep_legal_curp: '',
     nivel_facturacion: '', num_empleados: '', antiguedad: '',
     fuente_recursos: '', pais_origen_recursos: 'MX', opera_en_efectivo: 'no',
-    ekatena_rfc: '', ekatena_ciec: '',
+    ekatena_rfc: '', ekatena_ciec: '', giro_custom: '',
   })
   const [docs, setDocs] = useState({
     acta: emptyDoc(),
@@ -157,7 +157,7 @@ export default function KycWizardPage() {
         const res = await fetch('/api/v1/kyc/empresas/public', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ razon_social: form.razon_social + (form.tipo_societario && form.tipo_societario !== 'Otro' ? ' ' + form.tipo_societario : ''), rfc: form.rfc, tipo_persona: form.tipo_persona, giro: form.giro, pais: form.pais, rep_legal_nombre: form.rep_legal_nombre, rep_legal_curp: form.rep_legal_curp, acta_constitutiva_url: docs.acta.url || null, comprobante_domicilio_url: docs.domicilio.url || null, identificacion_rep_url: docs.identificacion.url || null, status: 'pending', metadata: { financiero: { nivel_facturacion: form.nivel_facturacion, num_empleados: form.num_empleados, antiguedad: form.antiguedad, fuente_recursos: form.fuente_recursos, pais_origen_recursos: form.pais_origen_recursos, opera_en_efectivo: form.opera_en_efectivo }, ekatena_conectado: ekatenaStatus === 'connected', ekatena_autenticado: ekatenaStatus === 'connected', ekatena_rfc: form.ekatena_rfc || form.rfc } }),
+          body: JSON.stringify({ razon_social: form.razon_social + (form.tipo_societario && form.tipo_societario !== 'Otro' ? ' ' + form.tipo_societario : ''), rfc: form.rfc, giro: form.giro === 'Otro' ? (form.giro_custom || 'Otro') : form.giro, tipo_persona: form.tipo_persona, giro: form.giro, pais: form.pais, rep_legal_nombre: form.rep_legal_nombre, rep_legal_curp: form.rep_legal_curp, acta_constitutiva_url: docs.acta.url || null, comprobante_domicilio_url: docs.domicilio.url || null, identificacion_rep_url: docs.identificacion.url || null, status: 'pending', metadata: { financiero: { nivel_facturacion: form.nivel_facturacion, num_empleados: form.num_empleados, antiguedad: form.antiguedad, fuente_recursos: form.fuente_recursos, pais_origen_recursos: form.pais_origen_recursos, opera_en_efectivo: form.opera_en_efectivo }, ekatena_conectado: ekatenaStatus === 'connected', ekatena_autenticado: ekatenaStatus === 'connected', ekatena_rfc: form.ekatena_rfc || form.rfc } }),
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Error')
@@ -307,9 +307,19 @@ export default function KycWizardPage() {
                   <FL>RFC * <span style={{ color: cl.gray400, fontSize: '0.68rem', fontWeight: '400' }}>({form.tipo_persona === 'moral' ? '12 chars' : '13 chars'})</span></FL>
                   <FI placeholder={form.tipo_persona === 'moral' ? 'EMP920101ABC' : 'GALJ900101H01'} value={form.rfc} onChange={v => up('rfc', v)} err={errors.rfc} mono />
                 </div>
-                <div>
+                <div style={{ gridColumn: '1/-1' }}>
                   <FL>Giro / Sector</FL>
-                  <FI placeholder="Fintech, Manufactura..." value={form.giro} onChange={v => up('giro', v)} />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', marginBottom: form.giro === 'Otro' ? '0.5rem' : '0' }}>
+                    {['Retail / Comercio', 'Manufactura', 'Tecnología', 'Servicios', 'Construcción', 'Finanzas', 'Salud', 'Otro'].map(g => (
+                      <button key={g} onClick={() => up('giro', form.giro === g ? '' : g)}
+                        style={{ padding: '0.55rem 0.4rem', borderRadius: '8px', cursor: 'pointer', border: form.giro === g ? '2px solid #0F7BF4' : `1.5px solid ${cl.gray200}`, background: form.giro === g ? '#EBF3FF' : cl.white, color: form.giro === g ? '#0F7BF4' : cl.gray500, fontSize: '0.73rem', fontWeight: form.giro === g ? '700' : '400', fontFamily: cl.fontFamily, textAlign: 'center', lineHeight: 1.3 }}>
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                  {form.giro === 'Otro' && (
+                    <FI placeholder="Describe tu industria..." value={form.giro_custom || ''} onChange={v => up('giro_custom', v)} />
+                  )}
                 </div>
                 <div>
                   <FL>País</FL>
