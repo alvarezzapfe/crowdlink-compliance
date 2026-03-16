@@ -45,7 +45,40 @@ interface ReporteGuardado {
   periodo: string
   folio_inicial: string
   num_ops: number
+  monto_total?: number
   status: 'borrador' | 'listo' | 'enviado'
+  ops?: ReporteOp[]
+  created_by?: string
+  created_at: string
+  updated_at?: string
+}
+
+interface Hallazgo {
+  id: string
+  auditoria_id: string
+  area: string
+  descripcion: string
+  riesgo: 'bajo' | 'medio' | 'alto' | 'critico'
+  recomendacion: string
+  responsable: string
+  fecha_compromiso: string
+  status: 'abierto' | 'en_proceso' | 'cerrado'
+  created_at: string
+}
+
+interface Auditoria {
+  id: string
+  ejercicio: number
+  status: 'en_proceso' | 'completada' | 'enviada_cnbv'
+  auditor_nombre: string
+  auditor_certificacion: string
+  fecha_inicio: string
+  fecha_conclusion: string
+  fecha_presentacion_consejo: string
+  observaciones: string
+  calificacion: string
+  pld_auditoria_hallazgos?: Hallazgo[]
+  created_by?: string
   created_at: string
 }
 
@@ -159,6 +192,17 @@ export default function PldPage() {
   const [reporteOps, setReporteOps] = useState<ReporteOp[]>([])
   const [reporteCurrentOp, setReporteCurrentOp] = useState<Partial<ReporteOp>>({})
   const [reportesGuardados, setReportesGuardados] = useState<ReporteGuardado[]>([])
+  const [reportesLoading, setReportesLoading] = useState(false)
+
+  // Auditoria state
+  const [auditorias, setAuditorias] = useState<Auditoria[]>([])
+  const [auditoriaLoading, setAuditoriaLoading] = useState(false)
+  const [showAuditoriaForm, setShowAuditoriaForm] = useState(false)
+  const [selectedAuditoria, setSelectedAuditoria] = useState<Auditoria | null>(null)
+  const [newAuditoria, setNewAuditoria] = useState({ ejercicio: new Date().getFullYear(), auditor_nombre: '', auditor_certificacion: '', fecha_inicio: '', fecha_conclusion: '', observaciones: '', calificacion: '' })
+  const [newHallazgo, setNewHallazgo] = useState({ area: '', descripcion: '', riesgo: 'medio', recomendacion: '', responsable: '', fecha_compromiso: '' })
+  const [showHallazgoForm, setShowHallazgoForm] = useState(false)
+  const [hallazgoSaving, setHallazgoSaving] = useState(false)
 
   useEffect(() => {
     const init = async () => {
@@ -190,7 +234,87 @@ export default function PldPage() {
 
   useEffect(() => {
     if (section === 'solicitantes' && sessionToken) loadSolicitantes()
+    if (section === 'reportes' && sessionToken) loadReportes()
+    if (section === 'auditoria' && sessionToken) loadAuditorias()
   }, [section, sessionToken, loadSolicitantes])
+
+  const loadReportes = async (token?: string) => {
+    setReportesLoading(true)
+    const t = token || sessionToken
+    if (!t) { setReportesLoading(false); return }
+    const res = await fetch('/api/v1/pld/reportes', { headers: { 'Authorization': 'Bearer ' + t } })
+    if (res.ok) { const d = await res.json(); setReportesGuardados(d.reportes || []) }
+    setReportesLoading(false)
+  }
+
+  const loadAuditorias = async (token?: string) => {
+    setAuditoriaLoading(true)
+    const t = token || sessionToken
+    if (!t) { setAuditoriaLoading(false); return }
+    const res = await fetch('/api/v1/pld/auditoria', { headers: { 'Authorization': 'Bearer ' + t } })
+    if (res.ok) { const d = await res.json(); setAuditorias(d.auditorias || []) }
+    setAuditoriaLoading(false)
+  }
+
+  const saveReporte = async (reporte: Omit<ReporteGuardado, 'id' | 'created_at'>) => {
+    const res = await fetch('/api/v1/pld/reportes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionToken },
+      body: JSON.stringify(reporte)
+    })
+    if (res.ok) { const d = await res.json(); setReportesGuardados(p => [d.reporte, ...p]) }
+  }
+
+  const updateReporteStatus = async (id: string, status: string) => {
+    await fetch('/api/v1/pld/reportes', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionToken },
+      body: JSON.stringify({ id, status })
+    })
+    setReportesGuardados(p => p.map(r => r.id === id ? { ...r, status: status as ReporteGuardado['status'] } : r))
+  }
+
+  const saveAuditoria = async () => {
+    const res = await fetch('/api/v1/pld/auditoria', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionToken },
+      body: JSON.stringify({ ...newAuditoria, status: 'en_proceso' })
+    })
+    if (res.ok) {
+      const d = await res.json()
+      setAuditorias(p => [d.auditoria, ...p])
+      setShowAuditoriaForm(false)
+      setSelectedAuditoria(d.auditoria)
+    }
+  }
+
+  const saveHallazgo = async () => {
+    if (!selectedAuditoria || !newHallazgo.area || !newHallazgo.descripcion) return
+    setHallazgoSaving(true)
+    const res = await fetch('/api/v1/pld/auditoria/hallazgos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionToken },
+      body: JSON.stringify({ ...newHallazgo, auditoria_id: selectedAuditoria.id })
+    })
+    if (res.ok) {
+      const d = await res.json()
+      setAuditorias(p => p.map(a => a.id === selectedAuditoria.id ? { ...a, pld_auditoria_hallazgos: [...(a.pld_auditoria_hallazgos || []), d.hallazgo] } : a))
+      setSelectedAuditoria(prev => prev ? { ...prev, pld_auditoria_hallazgos: [...(prev.pld_auditoria_hallazgos || []), d.hallazgo] } : prev)
+      setNewHallazgo({ area: '', descripcion: '', riesgo: 'medio', recomendacion: '', responsable: '', fecha_compromiso: '' })
+      setShowHallazgoForm(false)
+    }
+    setHallazgoSaving(false)
+  }
+
+  const updateHallazgoStatus = async (id: string, status: string) => {
+    await fetch('/api/v1/pld/auditoria/hallazgos', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionToken },
+      body: JSON.stringify({ id, status })
+    })
+    setAuditorias(p => p.map(a => ({ ...a, pld_auditoria_hallazgos: a.pld_auditoria_hallazgos?.map(h => h.id === id ? { ...h, status } : h) })))
+    setSelectedAuditoria(prev => prev ? { ...prev, pld_auditoria_hallazgos: prev.pld_auditoria_hallazgos?.map(h => h.id === id ? { ...h, status } : h) } : prev)
+  }
 
   const handleListaSearch = async () => {
     if (!listaQuery.trim()) return
@@ -238,7 +362,7 @@ export default function PldPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { margin: 0; padding: 0; overflow-x: hidden; }
+        html, body { margin: 0 !important; padding: 0 !important; overflow-x: hidden; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -763,19 +887,276 @@ export default function PldPage() {
         {/* ── AUDITORÍA ── */}
         {section === 'auditoria' && (
           <div style={{ padding: '2rem', animation: 'fadeIn 0.2s ease' }}>
-            <div style={{ marginBottom: '1.5rem' }}>
-              <h1 style={{ color: textPrimary, fontSize: '1.4rem', fontWeight: '700', margin: '0 0 0.3rem', letterSpacing: '-0.02em' }}>Log de Auditoría</h1>
-              <p style={{ color: textMuted, fontSize: '0.82rem', margin: 0 }}>Registro de todas las acciones del Oficial de Cumplimiento — conservación 5 años</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+              <div>
+                <h1 style={{ color: textPrimary, fontSize: '1.4rem', fontWeight: '700', margin: '0 0 0.3rem', letterSpacing: '-0.02em' }}>Auditoría Anual PLD/FT</h1>
+                <p style={{ color: textMuted, fontSize: '0.82rem', margin: 0 }}>Revisión anual · Auditor externo certificado CNBV · Conservación 5 años</p>
+              </div>
+              <button onClick={() => { setShowAuditoriaForm(true); setSelectedAuditoria(null) }}
+                style={{ background: accent, color: 'white', border: 'none', borderRadius: '9px', padding: '0.55rem 1.1rem', fontSize: '0.82rem', fontWeight: '600', cursor: 'pointer', fontFamily: font, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nueva auditoría
+              </button>
             </div>
-            <div style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', padding: '1.5rem' }}>
-              <div style={{ textAlign: 'center', padding: '3rem', color: textMuted }}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ margin: '0 auto 1rem', display: 'block', opacity: 0.4 }}>
-                  <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                <div style={{ fontSize: '0.9rem', fontWeight: '500', marginBottom: '0.4rem', color: textSecondary }}>Log de auditoría en construcción</div>
-                <div style={{ fontSize: '0.78rem' }}>Todas las consultas, reportes y modificaciones serán registradas aquí con timestamp y usuario.</div>
+
+            {/* Legal reminder */}
+            <div style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '10px', padding: '0.85rem 1rem', marginBottom: '1.5rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={accentYellow} strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, marginTop: '0.1rem' }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <div style={{ color: textMuted, fontSize: '0.78rem', lineHeight: 1.5 }}>
+                <span style={{ color: accentYellow, fontWeight: '600' }}>Obligación legal:</span> Las ITF deben contratar un auditor externo independiente certificado por CNBV para revisar el cumplimiento del programa PLD/FT. El informe se presenta al Consejo de Administración y se envía a CNBV vía SITI. Fundamento: Disposiciones Art. 58 LRITF.
               </div>
             </div>
+
+            {/* Form nueva auditoría */}
+            {showAuditoriaForm && (
+              <div style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', padding: '1.5rem', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                  <h3 style={{ color: textPrimary, fontSize: '0.95rem', fontWeight: '600', margin: 0 }}>Nueva revisión anual</h3>
+                  <button onClick={() => setShowAuditoriaForm(false)} style={{ background: 'none', border: 'none', color: textMuted, cursor: 'pointer', fontFamily: font, fontSize: '0.82rem' }}>Cancelar</button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.85rem', marginBottom: '1rem' }}>
+                  {[
+                    { label: 'EJERCICIO', key: 'ejercicio', type: 'number', placeholder: '2025' },
+                    { label: 'AUDITOR — NOMBRE', key: 'auditor_nombre', placeholder: 'Lic. Juan García' },
+                    { label: 'NO. CERTIFICACIÓN CNBV', key: 'auditor_certificacion', placeholder: 'CNBV-PLD-XXXX', mono: true },
+                    { label: 'FECHA INICIO', key: 'fecha_inicio', type: 'date' },
+                    { label: 'FECHA CONCLUSIÓN', key: 'fecha_conclusion', type: 'date' },
+                    { label: 'FECHA PRES. CONSEJO', key: 'fecha_presentacion_consejo', type: 'date' },
+                  ].map(f => (
+                    <div key={f.key}>
+                      <label style={{ color: textMuted, fontSize: '0.65rem', fontWeight: '600', letterSpacing: '0.08em', display: 'block', marginBottom: '0.3rem' }}>{f.label}</label>
+                      <input type={f.type || 'text'} value={String((newAuditoria as Record<string,unknown>)[f.key] || '')} onChange={e => setNewAuditoria(p => ({...p, [f.key]: f.type === 'number' ? Number(e.target.value) : e.target.value}))} placeholder={f.placeholder}
+                        style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.6rem 0.8rem', color: textPrimary, fontSize: '0.82rem', fontFamily: (f as {mono?: boolean}).mono ? fontMono : font }} />
+                    </div>
+                  ))}
+                  <div style={{ gridColumn: '1/-1' }}>
+                    <label style={{ color: textMuted, fontSize: '0.65rem', fontWeight: '600', letterSpacing: '0.08em', display: 'block', marginBottom: '0.3rem' }}>CALIFICACIÓN GENERAL</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                      {[
+                        { v: 'satisfactoria', l: 'Satisfactoria', c: accentGreen },
+                        { v: 'con_observaciones', l: 'Con observaciones', c: accentYellow },
+                        { v: 'no_satisfactoria', l: 'No satisfactoria', c: accentRed },
+                      ].map(o => (
+                        <button key={o.v} onClick={() => setNewAuditoria(p => ({...p, calificacion: o.v}))}
+                          style={{ padding: '0.55rem', borderRadius: '8px', cursor: 'pointer', border: `1.5px solid ${newAuditoria.calificacion === o.v ? o.c : navyBorder}`, background: newAuditoria.calificacion === o.v ? `${o.c}15` : 'rgba(255,255,255,0.02)', color: newAuditoria.calificacion === o.v ? o.c : textMuted, fontSize: '0.75rem', fontWeight: '500', fontFamily: font }}>
+                          {o.l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ gridColumn: '1/-1' }}>
+                    <label style={{ color: textMuted, fontSize: '0.65rem', fontWeight: '600', letterSpacing: '0.08em', display: 'block', marginBottom: '0.3rem' }}>OBSERVACIONES GENERALES</label>
+                    <textarea rows={2} value={newAuditoria.observaciones} onChange={e => setNewAuditoria(p => ({...p, observaciones: e.target.value}))} placeholder="Observaciones del auditor..."
+                      style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.6rem 0.8rem', color: textPrimary, fontSize: '0.82rem', fontFamily: font, resize: 'vertical' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button onClick={saveAuditoria} style={{ background: accent, color: 'white', border: 'none', borderRadius: '9px', padding: '0.65rem 1.5rem', fontSize: '0.85rem', fontWeight: '600', cursor: 'pointer', fontFamily: font }}>
+                    Crear revisión anual
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* List + Detail */}
+            {auditoriaLoading ? (
+              <div style={{ textAlign: 'center', padding: '3rem', color: textMuted }}>
+                <div style={{ width: '24px', height: '24px', border: '2.5px solid rgba(59,130,246,0.2)', borderTopColor: accent, borderRadius: '50%', animation: 'spin 0.7s linear infinite', margin: '0 auto 0.75rem' }} />
+                Cargando auditorías...
+              </div>
+            ) : auditorias.length === 0 && !showAuditoriaForm ? (
+              <div style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', padding: '3rem', textAlign: 'center' }}>
+                <div style={{ color: textMuted, fontSize: '0.88rem', marginBottom: '1rem' }}>Sin revisiones anuales registradas</div>
+                <button onClick={() => setShowAuditoriaForm(true)} style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: '9px', padding: '0.6rem 1.25rem', color: '#60A5FA', cursor: 'pointer', fontFamily: font, fontSize: '0.82rem' }}>
+                  Crear primera auditoría
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: selectedAuditoria ? '300px 1fr' : '1fr', gap: '1.25rem' }}>
+                {/* List */}
+                <div style={{ display: 'grid', gap: '0.75rem', alignContent: 'start' }}>
+                  {auditorias.map(a => {
+                    const sc = a.status === 'enviada_cnbv' ? { c: accentGreen, l: 'Enviada CNBV' } : a.status === 'completada' ? { c: accent, l: 'Completada' } : { c: accentYellow, l: 'En proceso' }
+                    const cal = a.calificacion === 'satisfactoria' ? { c: accentGreen, l: 'Satisfactoria' } : a.calificacion === 'con_observaciones' ? { c: accentYellow, l: 'Con obs.' } : a.calificacion === 'no_satisfactoria' ? { c: accentRed, l: 'No satisf.' } : null
+                    const isSelected = selectedAuditoria?.id === a.id
+                    return (
+                      <button key={a.id} onClick={() => setSelectedAuditoria(isSelected ? null : a)}
+                        style={{ background: isSelected ? 'rgba(59,130,246,0.1)' : navyLight, border: `1.5px solid ${isSelected ? accent : navyBorder}`, borderRadius: '10px', padding: '1rem', cursor: 'pointer', textAlign: 'left', fontFamily: font }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
+                          <span style={{ color: textPrimary, fontSize: '1rem', fontWeight: '700', fontFamily: fontMono }}>Ejercicio {a.ejercicio}</span>
+                          <span style={{ background: `${sc.c}15`, color: sc.c, fontSize: '0.65rem', fontWeight: '600', padding: '0.15rem 0.5rem', borderRadius: '9999px' }}>{sc.l}</span>
+                        </div>
+                        <div style={{ color: textMuted, fontSize: '0.75rem', marginBottom: '0.35rem' }}>{a.auditor_nombre || 'Auditor no asignado'}</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: textMuted, fontSize: '0.7rem' }}>{a.pld_auditoria_hallazgos?.length || 0} hallazgos</span>
+                          {cal && <span style={{ background: `${cal.c}15`, color: cal.c, fontSize: '0.65rem', fontWeight: '600', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>{cal.l}</span>}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Detail */}
+                {selectedAuditoria && (
+                  <div style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', overflow: 'hidden' }}>
+                    {/* Header */}
+                    <div style={{ padding: '1.25rem 1.5rem', borderBottom: `1px solid ${navyBorder}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <h3 style={{ color: textPrimary, fontSize: '1rem', fontWeight: '700', margin: '0 0 0.2rem' }}>Ejercicio {selectedAuditoria.ejercicio}</h3>
+                        <div style={{ color: textMuted, fontSize: '0.75rem' }}>{selectedAuditoria.auditor_nombre} {selectedAuditoria.auditor_certificacion && <span style={{ fontFamily: fontMono }}>· {selectedAuditoria.auditor_certificacion}</span>}</div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        {selectedAuditoria.status !== 'enviada_cnbv' && (
+                          <button onClick={async () => {
+                            const newStatus = selectedAuditoria.status === 'en_proceso' ? 'completada' : 'enviada_cnbv'
+                            await fetch('/api/v1/pld/auditoria', { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionToken }, body: JSON.stringify({ id: selectedAuditoria.id, status: newStatus }) })
+                            const updated = { ...selectedAuditoria, status: newStatus as Auditoria['status'] }
+                            setSelectedAuditoria(updated)
+                            setAuditorias(p => p.map(a => a.id === selectedAuditoria.id ? updated : a))
+                          }} style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: '7px', padding: '0.4rem 0.85rem', fontSize: '0.75rem', color: '#60A5FA', cursor: 'pointer', fontFamily: font }}>
+                            {selectedAuditoria.status === 'en_proceso' ? '✓ Marcar completada' : '↑ Marcar enviada CNBV'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Info grid */}
+                    <div style={{ padding: '1.25rem 1.5rem', borderBottom: `1px solid ${navyBorder}`, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+                      {[
+                        { l: 'Inicio', v: selectedAuditoria.fecha_inicio || '—' },
+                        { l: 'Conclusión', v: selectedAuditoria.fecha_conclusion || '—' },
+                        { l: 'Pres. Consejo', v: selectedAuditoria.fecha_presentacion_consejo || '—' },
+                      ].map(item => (
+                        <div key={item.l} style={{ background: 'rgba(255,255,255,0.02)', padding: '0.6rem 0.8rem', borderRadius: '7px' }}>
+                          <div style={{ color: textMuted, fontSize: '0.65rem', marginBottom: '0.2rem' }}>{item.l}</div>
+                          <div style={{ color: textSecondary, fontSize: '0.78rem', fontFamily: fontMono }}>{item.v}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Hallazgos */}
+                    <div style={{ padding: '1.25rem 1.5rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <h4 style={{ color: textPrimary, fontSize: '0.88rem', fontWeight: '600', margin: 0 }}>
+                          Hallazgos ({selectedAuditoria.pld_auditoria_hallazgos?.length || 0})
+                        </h4>
+                        <button onClick={() => setShowHallazgoForm(!showHallazgoForm)}
+                          style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '7px', padding: '0.35rem 0.75rem', fontSize: '0.75rem', color: '#60A5FA', cursor: 'pointer', fontFamily: font }}>
+                          + Agregar hallazgo
+                        </button>
+                      </div>
+
+                      {/* Hallazgo form */}
+                      {showHallazgoForm && (
+                        <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${navyBorder}`, borderRadius: '9px', padding: '1rem', marginBottom: '1rem' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginBottom: '0.65rem' }}>
+                            <div>
+                              <label style={{ color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.06em', display: 'block', marginBottom: '0.25rem' }}>ÁREA</label>
+                              <input value={newHallazgo.area} onChange={e => setNewHallazgo(p => ({...p, area: e.target.value}))} placeholder="Ej. KYC, PEPs, Reportes..." style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '7px', padding: '0.5rem 0.7rem', color: textPrimary, fontSize: '0.8rem', fontFamily: font }} />
+                            </div>
+                            <div>
+                              <label style={{ color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.06em', display: 'block', marginBottom: '0.25rem' }}>NIVEL DE RIESGO</label>
+                              <select value={newHallazgo.riesgo} onChange={e => setNewHallazgo(p => ({...p, riesgo: e.target.value}))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '7px', padding: '0.5rem 0.7rem', color: textPrimary, fontSize: '0.8rem', fontFamily: font }}>
+                                <option value="bajo">Bajo</option>
+                                <option value="medio">Medio</option>
+                                <option value="alto">Alto</option>
+                                <option value="critico">Crítico</option>
+                              </select>
+                            </div>
+                            <div style={{ gridColumn: '1/-1' }}>
+                              <label style={{ color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.06em', display: 'block', marginBottom: '0.25rem' }}>DESCRIPCIÓN DEL HALLAZGO</label>
+                              <textarea rows={2} value={newHallazgo.descripcion} onChange={e => setNewHallazgo(p => ({...p, descripcion: e.target.value}))} placeholder="Descripción del hallazgo identificado..." style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '7px', padding: '0.5rem 0.7rem', color: textPrimary, fontSize: '0.8rem', fontFamily: font, resize: 'vertical' }} />
+                            </div>
+                            <div style={{ gridColumn: '1/-1' }}>
+                              <label style={{ color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.06em', display: 'block', marginBottom: '0.25rem' }}>RECOMENDACIÓN</label>
+                              <textarea rows={2} value={newHallazgo.recomendacion} onChange={e => setNewHallazgo(p => ({...p, recomendacion: e.target.value}))} placeholder="Acción correctiva recomendada..." style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '7px', padding: '0.5rem 0.7rem', color: textPrimary, fontSize: '0.8rem', fontFamily: font, resize: 'vertical' }} />
+                            </div>
+                            <div>
+                              <label style={{ color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.06em', display: 'block', marginBottom: '0.25rem' }}>RESPONSABLE</label>
+                              <input value={newHallazgo.responsable} onChange={e => setNewHallazgo(p => ({...p, responsable: e.target.value}))} placeholder="Nombre del responsable" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '7px', padding: '0.5rem 0.7rem', color: textPrimary, fontSize: '0.8rem', fontFamily: font }} />
+                            </div>
+                            <div>
+                              <label style={{ color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.06em', display: 'block', marginBottom: '0.25rem' }}>FECHA COMPROMISO</label>
+                              <input type="date" value={newHallazgo.fecha_compromiso} onChange={e => setNewHallazgo(p => ({...p, fecha_compromiso: e.target.value}))} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '7px', padding: '0.5rem 0.7rem', color: textPrimary, fontSize: '0.8rem', fontFamily: fontMono }} />
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                            <button onClick={() => setShowHallazgoForm(false)} style={{ background: 'none', border: `1px solid ${navyBorder}`, borderRadius: '7px', padding: '0.5rem 1rem', fontSize: '0.8rem', color: textMuted, cursor: 'pointer', fontFamily: font }}>Cancelar</button>
+                            <button onClick={saveHallazgo} disabled={hallazgoSaving || !newHallazgo.area || !newHallazgo.descripcion}
+                              style={{ background: accentGreen, color: 'white', border: 'none', borderRadius: '7px', padding: '0.5rem 1.25rem', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer', fontFamily: font, opacity: hallazgoSaving || !newHallazgo.area || !newHallazgo.descripcion ? 0.5 : 1 }}>
+                              {hallazgoSaving ? 'Guardando...' : 'Guardar hallazgo'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Hallazgos list */}
+                      {(selectedAuditoria.pld_auditoria_hallazgos || []).length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '1.5rem', color: textMuted, fontSize: '0.8rem', background: 'rgba(255,255,255,0.01)', borderRadius: '8px' }}>
+                          Sin hallazgos registrados
+                        </div>
+                      ) : (
+                        <div style={{ display: 'grid', gap: '0.65rem' }}>
+                          {(selectedAuditoria.pld_auditoria_hallazgos || []).map(h => {
+                            const rColor = h.riesgo === 'critico' ? accentRed : h.riesgo === 'alto' ? '#F97316' : h.riesgo === 'medio' ? accentYellow : accentGreen
+                            const sColor = h.status === 'cerrado' ? accentGreen : h.status === 'en_proceso' ? accent : accentYellow
+                            return (
+                              <div key={h.id} style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.85rem 1rem' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <span style={{ background: `${rColor}15`, color: rColor, fontSize: '0.65rem', fontWeight: '700', padding: '0.15rem 0.5rem', borderRadius: '4px', textTransform: 'uppercase' }}>{h.riesgo}</span>
+                                    <span style={{ color: textSecondary, fontSize: '0.8rem', fontWeight: '600' }}>{h.area}</span>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <span style={{ background: `${sColor}15`, color: sColor, fontSize: '0.65rem', fontWeight: '600', padding: '0.15rem 0.5rem', borderRadius: '9999px' }}>
+                                      {h.status === 'cerrado' ? 'Cerrado' : h.status === 'en_proceso' ? 'En proceso' : 'Abierto'}
+                                    </span>
+                                    {h.status !== 'cerrado' && (
+                                      <button onClick={() => updateHallazgoStatus(h.id, h.status === 'abierto' ? 'en_proceso' : 'cerrado')}
+                                        style={{ background: 'none', border: `1px solid ${navyBorder}`, borderRadius: '5px', padding: '0.15rem 0.5rem', fontSize: '0.65rem', color: textMuted, cursor: 'pointer', fontFamily: font }}>
+                                        {h.status === 'abierto' ? '→ En proceso' : '✓ Cerrar'}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                                <p style={{ color: textMuted, fontSize: '0.78rem', margin: '0 0 0.4rem', lineHeight: 1.5 }}>{h.descripcion}</p>
+                                {h.recomendacion && <p style={{ color: textSecondary, fontSize: '0.75rem', margin: '0 0 0.35rem', lineHeight: 1.5 }}>↳ <em>{h.recomendacion}</em></p>}
+                                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.4rem' }}>
+                                  {h.responsable && <span style={{ color: textMuted, fontSize: '0.68rem' }}>Resp: <span style={{ color: textSecondary }}>{h.responsable}</span></span>}
+                                  {h.fecha_compromiso && <span style={{ color: textMuted, fontSize: '0.68rem' }}>Compromiso: <span style={{ color: textSecondary, fontFamily: fontMono }}>{h.fecha_compromiso}</span></span>}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {/* Resumen por riesgo */}
+                      {(selectedAuditoria.pld_auditoria_hallazgos || []).length > 0 && (
+                        <div style={{ marginTop: '1.25rem', padding: '0.85rem 1rem', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: `1px solid ${navyBorder}` }}>
+                          <div style={{ color: textMuted, fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.08em', marginBottom: '0.6rem' }}>RESUMEN POR NIVEL</div>
+                          <div style={{ display: 'flex', gap: '1rem' }}>
+                            {(['critico','alto','medio','bajo'] as const).map(nivel => {
+                              const count = (selectedAuditoria.pld_auditoria_hallazgos || []).filter(h => h.riesgo === nivel).length
+                              const c = nivel === 'critico' ? accentRed : nivel === 'alto' ? '#F97316' : nivel === 'medio' ? accentYellow : accentGreen
+                              return count > 0 ? (
+                                <div key={nivel} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                  <span style={{ color: c, fontSize: '1rem', fontWeight: '700', fontFamily: fontMono }}>{count}</span>
+                                  <span style={{ color: textMuted, fontSize: '0.72rem', textTransform: 'capitalize' }}>{nivel}</span>
+                                </div>
+                              ) : null
+                            })}
+                            <div style={{ marginLeft: 'auto', color: accentGreen, fontSize: '0.72rem' }}>
+                              {(selectedAuditoria.pld_auditoria_hallazgos || []).filter(h => h.status === 'cerrado').length}/{(selectedAuditoria.pld_auditoria_hallazgos || []).length} cerrados
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -946,20 +1327,20 @@ export default function PldPage() {
                   <div style={{ display:'flex', justifyContent:'space-between', gap:'0.75rem' }}>
                     <button onClick={() => setReporteStep(2)} style={{ background:'rgba(255,255,255,0.04)', border:`1px solid ${navyBorder}`, borderRadius:'9px', padding:'0.65rem 1.25rem', fontSize:'0.83rem', color:textSecondary, cursor:'pointer', fontFamily:font }}>← Editar</button>
                     <div style={{ display:'flex', gap:'0.5rem' }}>
-                      <button onClick={() => {
+                      <button onClick={async () => {
                         const periodo = (document.getElementById('reporte-periodo') as HTMLInputElement)?.value?.replace('-','') || new Date().toISOString().slice(0,7).replace('-','')
-                        setReportesGuardados(p => [{id:crypto.randomUUID(),tipo:reporteTipo,periodo,folio_inicial:'000001',num_ops:reporteOps.length,status:'borrador' as const,created_at:new Date().toISOString()},...p])
+                        await saveReporte({ tipo: reporteTipo, periodo, folio_inicial: '000001', num_ops: reporteOps.length, monto_total: reporteOps.reduce((s,o) => s+Number(o.monto||0),0), status: 'borrador', ops: reporteOps })
                         setShowReporteWizard(false)
                       }} style={{ background:'rgba(255,255,255,0.04)', border:`1px solid ${navyBorder}`, borderRadius:'9px', padding:'0.65rem 1.25rem', fontSize:'0.83rem', color:textSecondary, cursor:'pointer', fontFamily:font }}>
                         Guardar borrador
                       </button>
-                      <button onClick={() => {
+                      <button onClick={async () => {
                         const periodo = (document.getElementById('reporte-periodo') as HTMLInputElement)?.value?.replace('-','') || new Date().toISOString().slice(0,7).replace('-','')
                         const lines = reporteOps.map((op,i) => [reporteTipo,periodo,String(i+1).padStart(6,'0'),CASFIM_SUPERVISOR,CASFIM_ENTIDAD,'0',op.fecha_operacion?.replace(/-/g,'')||'',op.tipo_operacion||'01',op.monto||'0',op.moneda||'MXP',op.nacionalidad||'1',op.nombre_cliente||'',op.rfc_cliente||'',op.descripcion||'',op.razon_inusualidad||''].join('|')).join('\n')
                         const blob = new Blob([lines],{type:'text/plain'})
                         const url = URL.createObjectURL(blob)
                         const a = document.createElement('a'); a.href=url; a.download=`${reporteTipo}${periodo}${CASFIM_ENTIDAD}.txt`; a.click(); URL.revokeObjectURL(url)
-                        setReportesGuardados(p => [{id:crypto.randomUUID(),tipo:reporteTipo,periodo,folio_inicial:'000001',num_ops:reporteOps.length,status:'listo' as const,created_at:new Date().toISOString()},...p])
+                        await saveReporte({ tipo: reporteTipo, periodo, folio_inicial: '000001', num_ops: reporteOps.length, monto_total: reporteOps.reduce((s,o) => s+Number(o.monto||0),0), status: 'listo', ops: reporteOps })
                         setShowReporteWizard(false)
                       }} style={{ background:accentGreen, color:'white', border:'none', borderRadius:'9px', padding:'0.65rem 1.5rem', fontSize:'0.83rem', fontWeight:'600', cursor:'pointer', fontFamily:font }}>
                         ↓ Generar layout .txt
