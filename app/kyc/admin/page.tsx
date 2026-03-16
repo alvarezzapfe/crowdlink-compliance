@@ -562,6 +562,14 @@ export default function KycAdminPage() {
               </button>
             </div>
 
+            {/* Toast notification */}
+            {invEmailSent && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: '#ECFDF5', border: '1.5px solid #6EE7B7', borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1rem' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                <span style={{ color: '#065F46', fontSize: '0.85rem', fontWeight: '600' }}>Email enviado a {invJustCreated?.email || ''}</span>
+              </div>
+            )}
+
             {!invJustCreated ? (
               <div style={{ display: 'grid', gap: '1rem' }}>
                 <div>
@@ -611,14 +619,6 @@ export default function KycAdminPage() {
                 <button onClick={() => setInvJustCreated(null)} style={{ width: '100%', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '9px', padding: '0.7rem', fontSize: '0.82rem', fontWeight: '600', color: '#64748B', cursor: 'pointer', fontFamily: font }}>
                   Nueva invitación
                 </button>
-              </div>
-            )}
-
-            {/* Toast */}
-            {invEmailSent && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: '#ECFDF5', border: '1px solid #6EE7B7', borderRadius: '10px', padding: '0.75rem 1rem', marginBottom: '1rem', animation: 'fadeIn 0.2s ease' }}>
-                <IconCheck size={16} color="#059669" strokeWidth={2.5} />
-                <span style={{ color: '#065F46', fontSize: '0.85rem', fontWeight: '600' }}>Email enviado correctamente</span>
               </div>
             )}
 

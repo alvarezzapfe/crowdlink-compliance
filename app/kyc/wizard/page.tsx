@@ -157,7 +157,7 @@ export default function KycWizardPage() {
         const res = await fetch('/api/v1/kyc/empresas/public', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ razon_social: form.razon_social + (form.tipo_societario && form.tipo_societario !== 'Otro' ? ' ' + form.tipo_societario : ''), rfc: form.rfc, giro: form.giro === 'Otro' ? (form.giro_custom || 'Otro') : form.giro, tipo_persona: form.tipo_persona, pais: form.pais, rep_legal_nombre: form.rep_legal_nombre, rep_legal_curp: form.rep_legal_curp, acta_constitutiva_url: docs.acta.url || null, comprobante_domicilio_url: docs.domicilio.url || null, identificacion_rep_url: docs.identificacion.url || null, status: 'pending', metadata: { financiero: { nivel_facturacion: form.nivel_facturacion, num_empleados: form.num_empleados, antiguedad: form.antiguedad, fuente_recursos: form.fuente_recursos, pais_origen_recursos: form.pais_origen_recursos, opera_en_efectivo: form.opera_en_efectivo }, ekatena_conectado: ekatenaStatus === 'connected', ekatena_autenticado: ekatenaStatus === 'connected', ekatena_rfc: form.ekatena_rfc || form.rfc } }),
+          body: JSON.stringify({ razon_social: form.razon_social + (form.tipo_societario && form.tipo_societario !== 'Otro' ? ' ' + form.tipo_societario : ''), rfc: form.rfc, giro: form.giro === 'Otro' ? (form.giro_custom || 'Otro') : form.giro, tipo_persona: form.tipo_persona, giro: form.giro, pais: form.pais, rep_legal_nombre: form.rep_legal_nombre, rep_legal_curp: form.rep_legal_curp, acta_constitutiva_url: docs.acta.url || null, comprobante_domicilio_url: docs.domicilio.url || null, identificacion_rep_url: docs.identificacion.url || null, status: 'pending', metadata: { financiero: { nivel_facturacion: form.nivel_facturacion, num_empleados: form.num_empleados, antiguedad: form.antiguedad, fuente_recursos: form.fuente_recursos, pais_origen_recursos: form.pais_origen_recursos, opera_en_efectivo: form.opera_en_efectivo }, ekatena_conectado: ekatenaStatus === 'connected', ekatena_autenticado: ekatenaStatus === 'connected', ekatena_rfc: form.ekatena_rfc || form.rfc } }),
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Error')
@@ -260,17 +260,24 @@ export default function KycWizardPage() {
 
             {/* ── STEP 1 ── */}
             {step === 1 && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                 <div style={{ gridColumn: '1/-1' }}>
                   <FL>Razón Social * <span style={{ color: cl.gray400, fontSize: '0.68rem', fontWeight: '400' }}>máx. 60 caracteres</span></FL>
                   <div style={{ position: 'relative' }}>
                     <input
                       autoFocus
-                      placeholder="PELUCHE"
+                      placeholder="CAMARONES DEL SUR"
                       value={form.razon_social}
                       maxLength={60}
+                      autoComplete="off"
+                      spellCheck={false}
+                      onKeyDown={e => {
+                        // Explicitly allow space key
+                        if (e.key === ' ') {
+                          e.stopPropagation()
+                        }
+                      }}
                       onChange={e => {
-                        // Allow letters, numbers, spaces and common corp chars
                         const val = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚüÜñÑ0-9 .,'&()-]/g, '').toUpperCase()
                         up('razon_social', val)
                       }}
@@ -287,7 +294,7 @@ export default function KycWizardPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.4rem' }}>
                     {['S.A. de C.V.', 'S.A.P.I. de C.V.', 'S. de R.L.', 'S.C.', 'Otro'].map(t => (
                       <button key={t} onClick={() => up('tipo_societario', form.tipo_societario === t ? '' : t)}
-                        style={{ padding: '0.55rem 0.25rem', borderRadius: '8px', cursor: 'pointer', border: form.tipo_societario === t ? '2px solid #0F7BF4' : `1.5px solid ${cl.gray200}`, background: form.tipo_societario === t ? '#EBF3FF' : cl.white, color: form.tipo_societario === t ? '#0F7BF4' : cl.gray500, fontSize: '0.72rem', fontWeight: form.tipo_societario === t ? '700' : '400', fontFamily: cl.fontFamily, textAlign: 'center', lineHeight: 1.3 }}>
+                        style={{ padding: '0.45rem 0.2rem', borderRadius: '7px', cursor: 'pointer', border: form.tipo_societario === t ? '2px solid #0F7BF4' : `1.5px solid ${cl.gray200}`, background: form.tipo_societario === t ? '#EBF3FF' : cl.white, color: form.tipo_societario === t ? '#0F7BF4' : cl.gray500, fontSize: '0.7rem', fontWeight: form.tipo_societario === t ? '700' : '400', fontFamily: cl.fontFamily, textAlign: 'center', lineHeight: 1.3 }}>
                         {t}
                       </button>
                     ))}
@@ -309,10 +316,10 @@ export default function KycWizardPage() {
                 </div>
                 <div style={{ gridColumn: '1/-1' }}>
                   <FL>Giro / Sector</FL>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.4rem', marginBottom: form.giro === 'Otro' ? '0.5rem' : '0' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.35rem', marginBottom: form.giro === 'Otro' ? '0.4rem' : '0' }}>
                     {['Retail / Comercio', 'Manufactura', 'Tecnología', 'Servicios', 'Construcción', 'Finanzas', 'Salud', 'Otro'].map(g => (
                       <button key={g} onClick={() => up('giro', form.giro === g ? '' : g)}
-                        style={{ padding: '0.55rem 0.4rem', borderRadius: '8px', cursor: 'pointer', border: form.giro === g ? '2px solid #0F7BF4' : `1.5px solid ${cl.gray200}`, background: form.giro === g ? '#EBF3FF' : cl.white, color: form.giro === g ? '#0F7BF4' : cl.gray500, fontSize: '0.73rem', fontWeight: form.giro === g ? '700' : '400', fontFamily: cl.fontFamily, textAlign: 'center', lineHeight: 1.3 }}>
+                        style={{ padding: '0.45rem 0.3rem', borderRadius: '7px', cursor: 'pointer', border: form.giro === g ? '2px solid #0F7BF4' : `1.5px solid ${cl.gray200}`, background: form.giro === g ? '#EBF3FF' : cl.white, color: form.giro === g ? '#0F7BF4' : cl.gray500, fontSize: '0.73rem', fontWeight: form.giro === g ? '700' : '400', fontFamily: cl.fontFamily, textAlign: 'center', lineHeight: 1.3 }}>
                         {g}
                       </button>
                     ))}
@@ -320,15 +327,6 @@ export default function KycWizardPage() {
                   {form.giro === 'Otro' && (
                     <FI placeholder="Describe tu industria..." value={form.giro_custom || ''} onChange={v => up('giro_custom', v)} />
                   )}
-                </div>
-                <div>
-                  <FL>País</FL>
-                  <FS value={form.pais} onChange={v => up('pais', v)}>
-                    <option value="MX">México</option>
-                    <option value="US">Estados Unidos</option>
-                    <option value="CO">Colombia</option>
-                    <option value="OTHER">Otro</option>
-                  </FS>
                 </div>
               </div>
             )}
