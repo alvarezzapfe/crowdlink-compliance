@@ -17,10 +17,19 @@ export default function PldLoginPage() {
     const supabase = createClient()
     const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
     if (authError || !data.user) { setError('Credenciales incorrectas'); setLoading(false); return }
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'compliance')) {
-      await supabase.auth.signOut()
-      setError('Sin acceso al módulo PLD'); setLoading(false); return
+    const accessToken = data.session?.access_token
+    if (!accessToken) { await supabase.auth.signOut(); setError('Error de sesión'); setLoading(false); return }
+    // Allow admin and compliance roles + known PLD emails
+    const pldEmails = ['luis@crowdlink.mx', 'lalvarezzapfe@gmail.com', 'pld@crowdlink.mx']
+    if (!pldEmails.includes(data.user.email || '')) {
+      const roleRes = await fetch('/api/v1/auth/check-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+      })
+      if (!roleRes.ok) {
+        await supabase.auth.signOut()
+        setError('Sin acceso al módulo PLD'); setLoading(false); return
+      }
     }
     window.location.href = '/pld'
   }
