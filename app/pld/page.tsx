@@ -312,8 +312,8 @@ export default function PldPage() {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionToken },
       body: JSON.stringify({ id, status })
     })
-    setAuditorias(p => p.map(a => ({ ...a, pld_auditoria_hallazgos: a.pld_auditoria_hallazgos?.map(h => h.id === id ? { ...h, status: status as Hallazgo['status'] } : h) })) as Auditoria[])
-    setSelectedAuditoria(prev => prev ? { ...prev, pld_auditoria_hallazgos: prev.pld_auditoria_hallazgos?.map(h => h.id === id ? { ...h, status: status as Hallazgo['status'] } : h) } : prev)
+    setAuditorias(p => p.map(a => ({ ...a, pld_auditoria_hallazgos: a.pld_auditoria_hallazgos?.map(h => h.id === id ? { ...h, status } : h) })))
+    setSelectedAuditoria(prev => prev ? { ...prev, pld_auditoria_hallazgos: prev.pld_auditoria_hallazgos?.map(h => h.id === id ? { ...h, status } : h) } : prev)
   }
 
   const handleListaSearch = async () => {
@@ -362,7 +362,7 @@ export default function PldPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body { margin: 0 !important; padding: 0 !important; overflow-x: hidden; }
+        html, body { margin: 0; padding: 0; overflow-x: hidden; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -1336,8 +1336,30 @@ export default function PldPage() {
                       </button>
                       <button onClick={async () => {
                         const periodo = (document.getElementById('reporte-periodo') as HTMLInputElement)?.value?.replace('-','') || new Date().toISOString().slice(0,7).replace('-','')
-                        const lines = reporteOps.map((op,i) => [reporteTipo,periodo,String(i+1).padStart(6,'0'),CASFIM_SUPERVISOR,CASFIM_ENTIDAD,'0',op.fecha_operacion?.replace(/-/g,'')||'',op.tipo_operacion||'01',op.monto||'0',op.moneda||'MXP',op.nacionalidad||'1',op.nombre_cliente||'',op.rfc_cliente||'',op.descripcion||'',op.razon_inusualidad||''].join('|')).join('\n')
-                        const blob = new Blob([lines],{type:'text/plain'})
+                        // Layout oficial CNBV/UIF: separador ";", mayúsculas
+                        // Período: AAAAMM para Relevantes, AAAAMMDD para Inusuales/Preocupantes
+                        const lines = reporteOps.map((op,i) => {
+                          const fechaOp = op.fecha_operacion?.replace(/-/g,'') || ''
+                          const periodoField = reporteTipo === '1' ? periodo : fechaOp // AAAAMM o AAAAMMDD
+                          return [
+                            reporteTipo,           // Campo 1: Tipo
+                            periodoField,          // Campo 2: Período
+                            String(i+1).padStart(6,'0'), // Campo 3: Folio/Consecutivo
+                            CASFIM_SUPERVISOR,     // Campo 4: Órgano supervisor
+                            CASFIM_ENTIDAD,        // Campo 5: Clave entidad
+                            '0',                   // Campo 6: Sucursal
+                            fechaOp,               // Campo 7/13: Fecha operación AAAAMMDD
+                            op.tipo_operacion||'07', // Campo 8/9: Tipo operación
+                            (op.nombre_cliente||'').toUpperCase(), // Campo: Nombre
+                            (op.rfc_cliente||'').toUpperCase(),    // Campo: RFC
+                            op.monto||'0',         // Campo 11: Monto
+                            op.moneda||'MXP',      // Campo: Moneda
+                            op.nacionalidad||'1',  // Campo 15: Nacionalidad
+                            (op.descripcion||'').toUpperCase().replace(/;/g,','), // Campo 35: Descripción
+                            (op.razon_inusualidad||'').toUpperCase().replace(/;/g,','), // Campo 36: Razón inusualidad
+                          ].join(';')
+                        }).join('\n')
+                        const blob = new Blob([lines],{type:'text/plain;charset=utf-8'})
                         const url = URL.createObjectURL(blob)
                         const a = document.createElement('a'); a.href=url; a.download=`${reporteTipo}${periodo}${CASFIM_ENTIDAD}.txt`; a.click(); URL.revokeObjectURL(url)
                         await saveReporte({ tipo: reporteTipo, periodo, folio_inicial: '000001', num_ops: reporteOps.length, monto_total: reporteOps.reduce((s,o) => s+Number(o.monto||0),0), status: 'listo', ops: reporteOps })
