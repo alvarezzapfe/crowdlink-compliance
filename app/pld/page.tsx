@@ -22,6 +22,33 @@ interface ListaConsulta {
   nombre: string; rfc?: string; resultado: 'limpio' | 'alerta' | 'bloqueado'; listas: string[]; fecha: string
 }
 
+// ─── Report types ────────────────────────────────────────────────────────────
+interface ReporteOp {
+  folio: string
+  fecha_operacion: string
+  tipo_cliente: string
+  nombre_cliente: string
+  apellido_paterno: string
+  apellido_materno: string
+  rfc_cliente: string
+  nacionalidad: string
+  tipo_operacion: string
+  monto: string
+  moneda: string
+  descripcion: string
+  razon_inusualidad?: string
+}
+
+interface ReporteGuardado {
+  id: string
+  tipo: '1' | '2' | '3'
+  periodo: string
+  folio_inicial: string
+  num_ops: number
+  status: 'borrador' | 'listo' | 'enviado'
+  created_at: string
+}
+
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const navy = '#0B1120'
 const navyLight = '#111827'
@@ -55,6 +82,30 @@ const NAV = [
 ]
 
 // ─── Reportes config ──────────────────────────────────────────────────────────
+
+const TIPO_OP = [
+  { v: '01', l: 'Depósito en efectivo' },
+  { v: '02', l: 'Retiro en efectivo' },
+  { v: '03', l: 'Transferencia recibida' },
+  { v: '04', l: 'Transferencia enviada' },
+  { v: '05', l: 'Compra de divisas' },
+  { v: '06', l: 'Venta de divisas' },
+  { v: '07', l: 'Financiamiento colectivo — inversión' },
+  { v: '08', l: 'Financiamiento colectivo — solicitud' },
+  { v: '09', l: 'Pago de crédito' },
+  { v: '10', l: 'Otro' },
+]
+
+const MONEDAS = [
+  { v: 'MXP', l: 'Peso mexicano (MXP)' },
+  { v: 'USD', l: 'Dólar americano (USD)' },
+  { v: 'EUR', l: 'Euro (EUR)' },
+  { v: 'USDT', l: 'USDT (activo virtual)' },
+]
+
+const CASFIM_ENTIDAD = '0065022' // 065-022 → sin guión, con 0 al inicio
+const CASFIM_SUPERVISOR = '004000' // CNBV
+
 const REPORTES = [
   { id: 'Art. 66', nombre: 'Art. 66 — Operaciones Relevantes', freq: 'Trimestral', desc: 'Operaciones ≥ umbral UIF. Envío vía SITI dentro de los primeros 10 días hábiles de ene, abr, jul y oct. Base: Art. 66 Disp. Art. 58 LRITF.', color: accent, status: 'pendiente', vence: '2026-04-14' },
   { id: 'Art. 69', nombre: 'Art. 69 — Operaciones Inusuales', freq: '3 días hábiles', desc: 'Operaciones que no concuerdan con el perfil transaccional del cliente o carezcan de justificación económica. Plazo: 3 días hábiles desde dictaminación.', color: accentYellow, status: 'al_corriente', vence: null },
@@ -100,6 +151,14 @@ export default function PldPage() {
 
   // Token
   const [sessionToken, setSessionToken] = useState('')
+
+  // Reporte wizard state
+  const [showReporteWizard, setShowReporteWizard] = useState(false)
+  const [reporteStep, setReporteStep] = useState(1)
+  const [reporteTipo, setReporteTipo] = useState<'1'|'2'|'3'>('1')
+  const [reporteOps, setReporteOps] = useState<ReporteOp[]>([])
+  const [reporteCurrentOp, setReporteCurrentOp] = useState<Partial<ReporteOp>>({})
+  const [reportesGuardados, setReportesGuardados] = useState<ReporteGuardado[]>([])
 
   useEffect(() => {
     const init = async () => {
@@ -554,33 +613,91 @@ export default function PldPage() {
         {/* ── REPORTES ── */}
         {section === 'reportes' && (
           <div style={{ padding: '2rem', animation: 'fadeIn 0.2s ease' }}>
-            <div style={{ marginBottom: '1.5rem' }}>
-              <h1 style={{ color: textPrimary, fontSize: '1.4rem', fontWeight: '700', margin: '0 0 0.3rem', letterSpacing: '-0.02em' }}>Reportes CNBV</h1>
-              <p style={{ color: textMuted, fontSize: '0.82rem', margin: 0 }}>Obligaciones de reporte Art. 58 LRITF — via SHCP/UIF</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+              <div>
+                <h1 style={{ color: textPrimary, fontSize: '1.4rem', fontWeight: '700', margin: '0 0 0.3rem', letterSpacing: '-0.02em' }}>Reportes CNBV</h1>
+                <p style={{ color: textMuted, fontSize: '0.82rem', margin: 0 }}>Art. 66, 69 y 75 · SITI PLD/FT · CASFIM {CASFIM_ENTIDAD}</p>
+              </div>
+              <button onClick={() => { setShowReporteWizard(true); setReporteStep(1); setReporteOps([]); setReporteCurrentOp({}) }}
+                style={{ background: accent, color: 'white', border: 'none', borderRadius: '9px', padding: '0.55rem 1.1rem', fontSize: '0.82rem', fontWeight: '600', cursor: 'pointer', fontFamily: font, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nuevo reporte
+              </button>
             </div>
-            <div style={{ display: 'grid', gap: '1rem' }}>
+
+            {/* Obligaciones cards */}
+            <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '2rem' }}>
               {REPORTES.map(r => (
-                <div key={r.id} style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: r.color, boxShadow: `0 0 8px ${r.color}60`, flexShrink: 0 }} />
-                      <h3 style={{ color: textPrimary, fontSize: '0.95rem', fontWeight: '600', margin: 0 }}>{r.nombre}</h3>
-                      <span style={{ background: 'rgba(255,255,255,0.05)', color: textMuted, fontSize: '0.65rem', fontWeight: '600', padding: '0.15rem 0.55rem', borderRadius: '4px', letterSpacing: '0.06em' }}>{r.freq.toUpperCase()}</span>
+                <div key={r.id} style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: r.color, boxShadow: `0 0 8px ${r.color}60`, flexShrink: 0 }} />
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.2rem' }}>
+                        <h3 style={{ color: textPrimary, fontSize: '0.88rem', fontWeight: '600', margin: 0 }}>{r.nombre}</h3>
+                        <span style={{ background: 'rgba(255,255,255,0.05)', color: textMuted, fontSize: '0.62rem', fontWeight: '600', padding: '0.1rem 0.45rem', borderRadius: '4px', letterSpacing: '0.06em' }}>{r.freq.toUpperCase()}</span>
+                      </div>
+                      <p style={{ color: textMuted, fontSize: '0.78rem', margin: 0, lineHeight: 1.5 }}>{r.desc}</p>
                     </div>
-                    <p style={{ color: textMuted, fontSize: '0.82rem', margin: '0 0 0.75rem', lineHeight: 1.5 }}>{r.desc}</p>
-                    {r.vence && <div style={{ color: textMuted, fontSize: '0.72rem' }}>Próximo vencimiento: <span style={{ color: accentYellow }}>{new Date(r.vence).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>}
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end', marginLeft: '1.5rem', flexShrink: 0 }}>
-                    <span style={{ fontSize: '0.72rem', fontWeight: '600', padding: '0.2rem 0.7rem', borderRadius: '9999px',
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0, marginLeft: '1rem' }}>
+                    {r.vence && <span style={{ color: accentYellow, fontSize: '0.72rem' }}>Vence {new Date(r.vence).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}</span>}
+                    <span style={{ fontSize: '0.7rem', fontWeight: '600', padding: '0.2rem 0.65rem', borderRadius: '9999px',
                       background: r.status === 'presentado' ? 'rgba(16,185,129,0.1)' : r.status === 'pendiente' ? 'rgba(245,158,11,0.1)' : 'rgba(59,130,246,0.1)',
                       color: r.status === 'presentado' ? accentGreen : r.status === 'pendiente' ? accentYellow : accent,
                     }}>{r.status === 'presentado' ? 'Presentado' : r.status === 'pendiente' ? 'Pendiente' : 'Al corriente'}</span>
-                    <button style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '7px', padding: '0.4rem 0.85rem', fontSize: '0.75rem', color: '#60A5FA', cursor: 'pointer', fontFamily: font }}>
-                      Generar reporte
-                    </button>
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Reportes guardados */}
+            <div style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', overflow: 'hidden' }}>
+              <div style={{ padding: '1rem 1.25rem', borderBottom: `1px solid ${navyBorder}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: textPrimary, fontSize: '0.88rem', fontWeight: '600' }}>Reportes generados</span>
+                <span style={{ color: textMuted, fontSize: '0.75rem' }}>{reportesGuardados.length} registros</span>
+              </div>
+              {reportesGuardados.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: textMuted, fontSize: '0.82rem' }}>
+                  Sin reportes generados. Crea el primero con el botón + Nuevo reporte.
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: `1px solid ${navyBorder}` }}>
+                      {['Tipo', 'Período', 'Folio inicial', 'Operaciones', 'Status', 'Fecha', 'Acciones'].map(h => (
+                        <th key={h} style={{ padding: '0.65rem 1rem', textAlign: 'left', color: textMuted, fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.08em' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportesGuardados.map(r => (
+                      <tr key={r.id} style={{ borderBottom: `1px solid ${navyBorder}` }}>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <span style={{ color: r.tipo === '1' ? accent : r.tipo === '2' ? accentYellow : accentRed, fontSize: '0.78rem', fontWeight: '600', background: `${r.tipo === '1' ? accent : r.tipo === '2' ? accentYellow : accentRed}15`, padding: '0.15rem 0.55rem', borderRadius: '4px' }}>
+                            {r.tipo === '1' ? 'Relevante' : r.tipo === '2' ? 'Inusual' : 'Preocupante'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', color: textSecondary, fontSize: '0.82rem', fontFamily: fontMono }}>{r.periodo}</td>
+                        <td style={{ padding: '0.75rem 1rem', color: textMuted, fontSize: '0.78rem', fontFamily: fontMono }}>{r.folio_inicial}</td>
+                        <td style={{ padding: '0.75rem 1rem', color: textPrimary, fontSize: '0.82rem', fontFamily: fontMono }}>{r.num_ops}</td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <span style={{ fontSize: '0.68rem', fontWeight: '600', padding: '0.15rem 0.55rem', borderRadius: '9999px',
+                            background: r.status === 'enviado' ? 'rgba(16,185,129,0.1)' : r.status === 'listo' ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.1)',
+                            color: r.status === 'enviado' ? accentGreen : r.status === 'listo' ? accent : accentYellow }}>
+                            {r.status === 'enviado' ? 'Enviado SITI' : r.status === 'listo' ? 'Listo para enviar' : 'Borrador'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', color: textMuted, fontSize: '0.75rem' }}>{new Date(r.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}</td>
+                        <td style={{ padding: '0.75rem 1rem' }}>
+                          <button style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '6px', padding: '0.3rem 0.6rem', fontSize: '0.7rem', color: '#60A5FA', cursor: 'pointer', fontFamily: font }}>
+                            Descargar layout
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         )}
@@ -661,6 +778,199 @@ export default function PldPage() {
           </div>
         )}
       </div>
+
+      {/* ── REPORTE WIZARD MODAL ── */}
+      {showReporteWizard && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => {}}>
+          <div style={{ background: '#0F1729', border: `1px solid ${navyBorder}`, borderRadius: '18px', width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto', fontFamily: font }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: `1px solid ${navyBorder}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: '#0F1729', zIndex: 1 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.25rem' }}>
+                  {[1,2,3].map(s => (
+                    <div key={s} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: reporteStep >= s ? accent : 'rgba(255,255,255,0.06)', border: `1px solid ${reporteStep >= s ? accent : navyBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: '700', color: reporteStep >= s ? 'white' : textMuted }}>{s}</div>
+                      {s < 3 && <div style={{ width: '24px', height: '1px', background: reporteStep > s ? accent : navyBorder }} />}
+                    </div>
+                  ))}
+                </div>
+                <h2 style={{ color: textPrimary, fontSize: '0.95rem', fontWeight: '700', margin: 0 }}>
+                  {reporteStep === 1 ? 'Tipo y período' : reporteStep === 2 ? 'Captura de operaciones' : 'Revisión y generación'}
+                </h2>
+              </div>
+              <button onClick={() => setShowReporteWizard(false)} style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${navyBorder}`, borderRadius: '6px', width: '30px', height: '30px', cursor: 'pointer', color: textSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: font }}>✕</button>
+            </div>
+            <div style={{ padding: '1.5rem' }}>
+              {reporteStep === 1 && (
+                <div style={{ display: 'grid', gap: '1.25rem' }}>
+                  <div>
+                    <label style={{ color: textMuted, fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.08em', display: 'block', marginBottom: '0.6rem' }}>TIPO DE REPORTE</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.6rem' }}>
+                      {([{v:'1' as const,l:'Operaciones Relevantes',sub:'Art. 66 · Trimestral',c:accent},{v:'2' as const,l:'Operaciones Inusuales',sub:'Art. 69 · 3 días hábiles',c:accentYellow},{v:'3' as const,l:'Ops. Internas Preocupantes',sub:'Art. 75 · 3 días hábiles',c:accentRed}]).map(t => (
+                        <button key={t.v} onClick={() => setReporteTipo(t.v)} style={{ padding: '1rem 0.75rem', borderRadius: '10px', cursor: 'pointer', border: `1.5px solid ${reporteTipo === t.v ? t.c : navyBorder}`, background: reporteTipo === t.v ? `${t.c}12` : 'rgba(255,255,255,0.02)', textAlign: 'left', fontFamily: font }}>
+                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: t.c, marginBottom: '0.6rem' }} />
+                          <div style={{ color: textPrimary, fontSize: '0.82rem', fontWeight: '600', marginBottom: '0.2rem' }}>{t.l}</div>
+                          <div style={{ color: textMuted, fontSize: '0.68rem' }}>{t.sub}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div>
+                      <label style={{ color: textMuted, fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.08em', display: 'block', marginBottom: '0.4rem' }}>PERÍODO (AAAAMM)</label>
+                      <input type="month" id="reporte-periodo" defaultValue={new Date().toISOString().slice(0,7)} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.65rem 0.9rem', color: textPrimary, fontSize: '0.85rem', fontFamily: fontMono }} />
+                    </div>
+                    <div>
+                      <label style={{ color: textMuted, fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.08em', display: 'block', marginBottom: '0.4rem' }}>FOLIO INICIAL</label>
+                      <input placeholder="000001" maxLength={6} id="reporte-folio" defaultValue="000001" style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.65rem 0.9rem', color: textPrimary, fontSize: '0.85rem', fontFamily: fontMono }} />
+                    </div>
+                  </div>
+                  <div style={{ padding: '0.85rem 1rem', background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: '8px' }}>
+                    <div style={{ color: '#60A5FA', fontSize: '0.75rem', fontWeight: '600', marginBottom: '0.3rem' }}>Datos precargados (CASFIM 065-022)</div>
+                    <div style={{ color: textMuted, fontSize: '0.72rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.2rem' }}>
+                      <span>Órgano supervisor: <span style={{ fontFamily: fontMono, color: textSecondary }}>{CASFIM_SUPERVISOR} (CNBV)</span></span>
+                      <span>Clave entidad: <span style={{ fontFamily: fontMono, color: textSecondary }}>{CASFIM_ENTIDAD}</span></span>
+                      <span>Razón social: <span style={{ color: textSecondary }}>PorCuanto S.A. de C.V.</span></span>
+                      <span>Sucursal: <span style={{ fontFamily: fontMono, color: textSecondary }}>0 (sin sucursal)</span></span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button onClick={() => setReporteStep(2)} style={{ background: accent, color: 'white', border: 'none', borderRadius: '9px', padding: '0.75rem 1.5rem', fontSize: '0.88rem', fontWeight: '600', cursor: 'pointer', fontFamily: font }}>Continuar →</button>
+                  </div>
+                </div>
+              )}
+              {reporteStep === 2 && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <span style={{ color: textSecondary, fontSize: '0.82rem' }}>{reporteOps.length} operación{reporteOps.length !== 1 ? 'es' : ''} capturada{reporteOps.length !== 1 ? 's' : ''}</span>
+                    <label style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '7px', padding: '0.35rem 0.8rem', fontSize: '0.75rem', color: '#60A5FA', cursor: 'pointer', fontFamily: font }}>
+                      <input type="file" accept=".xlsx,.csv" style={{ display: 'none' }} onChange={() => alert('Carga Excel próximamente')} />↑ Excel
+                    </label>
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${navyBorder}`, borderRadius: '10px', padding: '1.25rem', marginBottom: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                      {([
+                        {label:'FECHA OPERACIÓN',key:'fecha_operacion',type:'date',mono:true},
+                        {label:'TIPO OPERACIÓN',key:'tipo_operacion',type:'select',opts:TIPO_OP},
+                        {label:'NOMBRE / RAZÓN SOCIAL',key:'nombre_cliente',placeholder:'Nombre completo'},
+                        {label:'RFC',key:'rfc_cliente',placeholder:'RFC',mono:true},
+                        {label:'MONTO',key:'monto',placeholder:'0.00',mono:true},
+                        {label:'MONEDA',key:'moneda',type:'select',opts:MONEDAS},
+                        {label:'NACIONALIDAD (1=MX 2=EXT)',key:'nacionalidad',placeholder:'1',mono:true},
+                        {label:'TIPO CLIENTE',key:'tipo_cliente',type:'select',opts:[{v:'1',l:'Inversionista'},{v:'2',l:'Solicitante'},{v:'3',l:'Relacionado'}]},
+                      ] as {label:string,key:string,type?:string,placeholder?:string,mono?:boolean,opts?:{v:string,l:string}[]}[]).map(f => (
+                        <div key={f.key}>
+                          <label style={{ color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.06em', display: 'block', marginBottom: '0.25rem' }}>{f.label}</label>
+                          {f.type === 'select' ? (
+                            <select value={(reporteCurrentOp as Record<string,string>)[f.key]||''} onChange={e => setReporteCurrentOp(p=>({...p,[f.key]:e.target.value}))} style={{ width:'100%', background:'rgba(255,255,255,0.04)', border:`1px solid ${navyBorder}`, borderRadius:'7px', padding:'0.5rem 0.7rem', color:textPrimary, fontSize:'0.8rem', fontFamily:font }}>
+                              <option value="">Seleccionar...</option>
+                              {f.opts!.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+                            </select>
+                          ) : (
+                            <input type={f.type||'text'} value={(reporteCurrentOp as Record<string,string>)[f.key]||''} onChange={e => setReporteCurrentOp(p=>({...p,[f.key]:e.target.value}))} placeholder={f.placeholder} style={{ width:'100%', background:'rgba(255,255,255,0.04)', border:`1px solid ${navyBorder}`, borderRadius:'7px', padding:'0.5rem 0.7rem', color:textPrimary, fontSize:'0.8rem', fontFamily:f.mono?fontMono:font }} />
+                          )}
+                        </div>
+                      ))}
+                      <div style={{ gridColumn:'1/-1' }}>
+                        <label style={{ color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.06em', display: 'block', marginBottom: '0.25rem' }}>DESCRIPCIÓN (Campo 35)</label>
+                        <textarea rows={2} value={reporteCurrentOp.descripcion||''} onChange={e => setReporteCurrentOp(p=>({...p,descripcion:e.target.value}))} placeholder="Descripción de la operación..." style={{ width:'100%', background:'rgba(255,255,255,0.04)', border:`1px solid ${navyBorder}`, borderRadius:'7px', padding:'0.5rem 0.7rem', color:textPrimary, fontSize:'0.8rem', fontFamily:font, resize:'vertical' }} />
+                      </div>
+                      {(reporteTipo==='2'||reporteTipo==='3') && (
+                        <div style={{ gridColumn:'1/-1' }}>
+                          <label style={{ color: accentYellow, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.06em', display: 'block', marginBottom: '0.25rem' }}>RAZÓN DE INUSUALIDAD (Campo 36) — OBLIGATORIO</label>
+                          <textarea rows={2} value={reporteCurrentOp.razon_inusualidad||''} onChange={e => setReporteCurrentOp(p=>({...p,razon_inusualidad:e.target.value}))} placeholder="Criterios, señales de alerta y análisis..." style={{ width:'100%', background:'rgba(245,158,11,0.04)', border:`1px solid rgba(245,158,11,0.2)`, borderRadius:'7px', padding:'0.5rem 0.7rem', color:textPrimary, fontSize:'0.8rem', fontFamily:font, resize:'vertical' }} />
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={() => {
+                      if (!reporteCurrentOp.fecha_operacion||!reporteCurrentOp.monto) return
+                      const folio = String(reporteOps.length+1).padStart(6,'0')
+                      setReporteOps(p => [...p, {...reporteCurrentOp, folio} as ReporteOp])
+                      setReporteCurrentOp({})
+                    }} style={{ marginTop:'0.85rem', background:accentGreen, color:'white', border:'none', borderRadius:'8px', padding:'0.55rem 1.25rem', fontSize:'0.82rem', fontWeight:'600', cursor:'pointer', fontFamily:font }}>
+                      + Agregar operación
+                    </button>
+                  </div>
+                  {reporteOps.length > 0 && (
+                    <div style={{ border:`1px solid ${navyBorder}`, borderRadius:'8px', overflow:'hidden', marginBottom:'1rem' }}>
+                      <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                        <thead><tr style={{ background:'rgba(255,255,255,0.02)', borderBottom:`1px solid ${navyBorder}` }}>
+                          {['Folio','Fecha','Cliente','Monto',''].map(h => <th key={h} style={{ padding:'0.45rem 0.75rem', textAlign:'left', color:textMuted, fontSize:'0.62rem', fontWeight:'600' }}>{h}</th>)}
+                        </tr></thead>
+                        <tbody>
+                          {reporteOps.map((op,i) => (
+                            <tr key={i} style={{ borderBottom:`1px solid ${navyBorder}` }}>
+                              <td style={{ padding:'0.45rem 0.75rem', fontFamily:fontMono, fontSize:'0.7rem', color:textMuted }}>{op.folio}</td>
+                              <td style={{ padding:'0.45rem 0.75rem', fontSize:'0.75rem', color:textSecondary }}>{op.fecha_operacion}</td>
+                              <td style={{ padding:'0.45rem 0.75rem', fontSize:'0.75rem', color:textPrimary }}>{op.nombre_cliente||'—'} <span style={{ color:textMuted, fontFamily:fontMono, fontSize:'0.65rem' }}>{op.rfc_cliente}</span></td>
+                              <td style={{ padding:'0.45rem 0.75rem', fontFamily:fontMono, fontSize:'0.75rem', color:textPrimary }}>{Number(op.monto||0).toLocaleString('es-MX',{style:'currency',currency:'MXN'})}</td>
+                              <td style={{ padding:'0.45rem 0.75rem' }}><button onClick={() => setReporteOps(p => p.filter((_,idx) => idx!==i))} style={{ background:'none', border:'none', color:accentRed, cursor:'pointer', fontSize:'0.75rem' }}>✕</button></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <div style={{ display:'flex', justifyContent:'space-between' }}>
+                    <button onClick={() => setReporteStep(1)} style={{ background:'rgba(255,255,255,0.04)', border:`1px solid ${navyBorder}`, borderRadius:'9px', padding:'0.65rem 1.25rem', fontSize:'0.83rem', color:textSecondary, cursor:'pointer', fontFamily:font }}>← Anterior</button>
+                    <button onClick={() => reporteOps.length > 0 && setReporteStep(3)} disabled={reporteOps.length === 0} style={{ background:reporteOps.length > 0 ? accent : 'rgba(59,130,246,0.2)', color:'white', border:'none', borderRadius:'9px', padding:'0.65rem 1.5rem', fontSize:'0.83rem', fontWeight:'600', cursor:reporteOps.length>0?'pointer':'not-allowed', fontFamily:font }}>
+                      Revisar → ({reporteOps.length} ops)
+                    </button>
+                  </div>
+                </div>
+              )}
+              {reporteStep === 3 && (
+                <div>
+                  <div style={{ background:'rgba(59,130,246,0.05)', border:'1px solid rgba(59,130,246,0.15)', borderRadius:'10px', padding:'1.25rem', marginBottom:'1.25rem' }}>
+                    <div style={{ color:'#60A5FA', fontSize:'0.78rem', fontWeight:'700', marginBottom:'0.75rem' }}>RESUMEN DEL REPORTE</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'0.75rem' }}>
+                      {[
+                        {l:'Tipo',v:reporteTipo==='1'?'Relevante':reporteTipo==='2'?'Inusual':'Preocupante'},
+                        {l:'CASFIM',v:CASFIM_ENTIDAD},
+                        {l:'Supervisor',v:CASFIM_SUPERVISOR},
+                        {l:'Operaciones',v:String(reporteOps.length)},
+                        {l:'Monto total',v:reporteOps.reduce((s,o)=>s+Number(o.monto||0),0).toLocaleString('es-MX',{style:'currency',currency:'MXN'})},
+                        {l:'Folio inicial',v:'000001'},
+                      ].map(item => (
+                        <div key={item.l} style={{ background:'rgba(255,255,255,0.03)', padding:'0.65rem 0.85rem', borderRadius:'7px' }}>
+                          <div style={{ color:textMuted, fontSize:'0.65rem', marginBottom:'0.2rem' }}>{item.l}</div>
+                          <div style={{ color:textPrimary, fontSize:'0.82rem', fontWeight:'600', fontFamily:fontMono }}>{item.v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ background:'rgba(16,185,129,0.04)', border:'1px solid rgba(16,185,129,0.15)', borderRadius:'8px', padding:'0.85rem 1rem', marginBottom:'1.25rem' }}>
+                    <div style={{ color:accentGreen, fontSize:'0.78rem', fontWeight:'600' }}>✓ Layout listo para SITI PLD/FT (websitipld.cnbv.gob.mx)</div>
+                    <div style={{ color:textMuted, fontSize:'0.72rem', marginTop:'0.2rem' }}>Nomenclatura del archivo: {reporteTipo}{(new Date().toISOString().slice(0,7).replace('-',''))}{CASFIM_ENTIDAD}.txt</div>
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', gap:'0.75rem' }}>
+                    <button onClick={() => setReporteStep(2)} style={{ background:'rgba(255,255,255,0.04)', border:`1px solid ${navyBorder}`, borderRadius:'9px', padding:'0.65rem 1.25rem', fontSize:'0.83rem', color:textSecondary, cursor:'pointer', fontFamily:font }}>← Editar</button>
+                    <div style={{ display:'flex', gap:'0.5rem' }}>
+                      <button onClick={() => {
+                        const periodo = (document.getElementById('reporte-periodo') as HTMLInputElement)?.value?.replace('-','') || new Date().toISOString().slice(0,7).replace('-','')
+                        setReportesGuardados(p => [{id:crypto.randomUUID(),tipo:reporteTipo,periodo,folio_inicial:'000001',num_ops:reporteOps.length,status:'borrador' as const,created_at:new Date().toISOString()},...p])
+                        setShowReporteWizard(false)
+                      }} style={{ background:'rgba(255,255,255,0.04)', border:`1px solid ${navyBorder}`, borderRadius:'9px', padding:'0.65rem 1.25rem', fontSize:'0.83rem', color:textSecondary, cursor:'pointer', fontFamily:font }}>
+                        Guardar borrador
+                      </button>
+                      <button onClick={() => {
+                        const periodo = (document.getElementById('reporte-periodo') as HTMLInputElement)?.value?.replace('-','') || new Date().toISOString().slice(0,7).replace('-','')
+                        const lines = reporteOps.map((op,i) => [reporteTipo,periodo,String(i+1).padStart(6,'0'),CASFIM_SUPERVISOR,CASFIM_ENTIDAD,'0',op.fecha_operacion?.replace(/-/g,'')||'',op.tipo_operacion||'01',op.monto||'0',op.moneda||'MXP',op.nacionalidad||'1',op.nombre_cliente||'',op.rfc_cliente||'',op.descripcion||'',op.razon_inusualidad||''].join('|')).join('\n')
+                        const blob = new Blob([lines],{type:'text/plain'})
+                        const url = URL.createObjectURL(blob)
+                        const a = document.createElement('a'); a.href=url; a.download=`${reporteTipo}${periodo}${CASFIM_ENTIDAD}.txt`; a.click(); URL.revokeObjectURL(url)
+                        setReportesGuardados(p => [{id:crypto.randomUUID(),tipo:reporteTipo,periodo,folio_inicial:'000001',num_ops:reporteOps.length,status:'listo' as const,created_at:new Date().toISOString()},...p])
+                        setShowReporteWizard(false)
+                      }} style={{ background:accentGreen, color:'white', border:'none', borderRadius:'9px', padding:'0.65rem 1.5rem', fontSize:'0.83rem', fontWeight:'600', cursor:'pointer', fontFamily:font }}>
+                        ↓ Generar layout .txt
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── MODAL NUEVO INVERSIONISTA ── */}
       {showAddInv && (
