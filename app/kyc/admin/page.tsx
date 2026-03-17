@@ -719,6 +719,7 @@ export default function KycAdminPage() {
         </div>
       )}
     </div>
+    </>
   )
 }
 
