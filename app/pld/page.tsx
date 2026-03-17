@@ -288,6 +288,11 @@ export default function PldPage() {
 
   // Token
   const [sessionToken, setSessionToken] = useState('')
+  const [sessionWarning, setSessionWarning] = useState(false)
+  const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const warningTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const INACTIVITY_LIMIT = 30 * 60 * 1000 // 30 min
+  const WARNING_BEFORE = 5 * 60 * 1000    // warning 5 min before
 
   // Reporte wizard state
   const [showReporteWizard, setShowReporteWizard] = useState(false)
@@ -419,6 +424,29 @@ export default function PldPage() {
     setAuditorias(p => p.map(a => ({ ...a, pld_auditoria_hallazgos: a.pld_auditoria_hallazgos?.map(h => h.id === id ? { ...h, status: status as Hallazgo['status'] } : h) })) as Auditoria[])
     setSelectedAuditoria(prev => prev ? { ...prev, pld_auditoria_hallazgos: prev.pld_auditoria_hallazgos?.map(h => h.id === id ? { ...h, status: status as Hallazgo['status'] } : h) } : prev)
   }
+
+  const resetInactivityTimer = useCallback(() => {
+    setSessionWarning(false)
+    if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
+    if (warningTimer.current) clearTimeout(warningTimer.current)
+    warningTimer.current = setTimeout(() => setSessionWarning(true), INACTIVITY_LIMIT - WARNING_BEFORE)
+    inactivityTimer.current = setTimeout(async () => {
+      const supabase = (await import('@/lib/supabase-client')).createClient()
+      await supabase.auth.signOut()
+      window.location.href = '/pld/login'
+    }, INACTIVITY_LIMIT)
+  }, [INACTIVITY_LIMIT, WARNING_BEFORE])
+
+  useEffect(() => {
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click']
+    events.forEach(e => window.addEventListener(e, resetInactivityTimer, { passive: true }))
+    resetInactivityTimer()
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetInactivityTimer))
+      if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
+      if (warningTimer.current) clearTimeout(warningTimer.current)
+    }
+  }, [resetInactivityTimer])
 
   const handleListaSearch = async () => {
     if (!listaQuery.trim()) return
@@ -1264,6 +1292,15 @@ export default function PldPage() {
           </div>
         )}
       </div>
+
+      {/* ── SESSION WARNING BANNER ── */}
+      {sessionWarning && (
+        <div style={{ position: 'fixed', bottom: '1.5rem', left: '50%', transform: 'translateX(-50%)', background: '#7C2D12', border: '1px solid #DC2626', borderRadius: '12px', padding: '0.85rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', zIndex: 500, boxShadow: '0 4px 24px rgba(0,0,0,0.4)' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FCA5A5" strokeWidth="2.5" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span style={{ color: '#FCA5A5', fontSize: '0.82rem', fontFamily: font }}>Sesión expira en 5 minutos por inactividad</span>
+          <button onClick={resetInactivityTimer} style={{ background: '#DC2626', color: 'white', border: 'none', borderRadius: '6px', padding: '0.3rem 0.75rem', fontSize: '0.75rem', cursor: 'pointer', fontFamily: font, fontWeight: '600' }}>Continuar sesión</button>
+        </div>
+      )}
 
       {/* ── REPORTE WIZARD MODAL ── */}
       {showReporteWizard && (

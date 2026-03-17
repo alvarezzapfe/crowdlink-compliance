@@ -199,7 +199,36 @@ export default function KycAdminPage() {
   const filtered = empresas.filter(e => {
     if (filter !== 'all' && e.status !== filter) return false
     if (!search) return true
-    return (e.razon_social || '').toLowerCase().includes(search.toLowerCase()) ||
+    // Inactivity timeout — 30 min
+  const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const warningTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [sessionWarning, setSessionWarning] = useState(false)
+
+  const resetInactivity = useCallback(() => {
+    setSessionWarning(false)
+    if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
+    if (warningTimer.current) clearTimeout(warningTimer.current)
+    warningTimer.current = setTimeout(() => setSessionWarning(true), 25 * 60 * 1000)
+    inactivityTimer.current = setTimeout(async () => {
+      const { createClient } = await import('@/lib/supabase-client')
+      const supabase = createClient()
+      await supabase.auth.signOut()
+      window.location.href = '/login'
+    }, 30 * 60 * 1000)
+  }, [])
+
+  useEffect(() => {
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart']
+    events.forEach(e => window.addEventListener(e, resetInactivity, { passive: true }))
+    resetInactivity()
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetInactivity))
+      if (inactivityTimer.current) clearTimeout(inactivityTimer.current)
+      if (warningTimer.current) clearTimeout(warningTimer.current)
+    }
+  }, [resetInactivity])
+
+  return (e.razon_social || '').toLowerCase().includes(search.toLowerCase()) ||
            (e.rfc || '').toLowerCase().includes(search.toLowerCase()) ||
            (e.giro || '').toLowerCase().includes(search.toLowerCase())
   })
@@ -215,6 +244,13 @@ export default function KycAdminPage() {
   const font = "'DM Sans', system-ui, sans-serif"
 
   return (
+    <>
+    {sessionWarning && (
+      <div style={{ position: 'fixed', bottom: '1.5rem', left: '50%', transform: 'translateX(-50%)', background: '#7C2D12', border: '1px solid #DC2626', borderRadius: '12px', padding: '0.85rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', zIndex: 9999 }}>
+        <span style={{ color: '#FCA5A5', fontSize: '0.82rem' }}>Sesión expira en 5 min por inactividad</span>
+        <button onClick={resetInactivity} style={{ background: '#DC2626', color: 'white', border: 'none', borderRadius: '6px', padding: '0.3rem 0.75rem', fontSize: '0.75rem', cursor: 'pointer', fontWeight: '600' }}>Continuar</button>
+      </div>
+    )}
     <div style={{ minHeight: '100vh', background: '#F1F5F9', fontFamily: font }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
@@ -454,7 +490,7 @@ export default function KycAdminPage() {
                     <DR l="Nombre" v={selected?.rep_legal_nombre || '—'} />
                     <DR l="CURP" v={selected?.rep_legal_curp || '—'} mono />
                   </Section>
-                  {!!(selected?.metadata?.financiero) && (
+                  {selected?.metadata?.financiero && (
                     <Section title="Perfil Financiero">
                       <DR l="Facturación" v={String((selected.metadata.financiero as Record<string,unknown>)?.nivel_facturacion || '—')} />
                       <DR l="Empleados" v={String((selected.metadata.financiero as Record<string,unknown>)?.num_empleados || '—')} />
@@ -703,5 +739,6 @@ function DR({ l, v, mono }: { l: string; v: string; mono?: boolean }) {
       <span style={{ color: '#64748B', fontSize: '0.78rem' }}>{l}</span>
       <span style={{ color: '#1E293B', fontSize: '0.8rem', fontWeight: '500', fontFamily: mono ? 'monospace' : 'inherit', maxWidth: '60%', textAlign: 'right' }}>{v}</span>
     </div>
+  </>
   )
 }
