@@ -959,7 +959,7 @@ export default function PldPage() {
                     <div>
                       <div style={{ color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.08em', marginBottom: '0.4rem' }}>ACTIVIDAD ECONÓMICA</div>
                       <div style={{ color: textSecondary, fontSize: '0.75rem', lineHeight: 1.5 }}>{String(selectedInv.actividad_economica||'—')}</div>
-                      {selectedInv.id_actividad && <div style={{ fontFamily: fontMono, fontSize: '0.68rem', color: textMuted, marginTop: '0.2rem' }}>SCIAN: {String(selectedInv.id_actividad)}</div>}
+                      {!!(selectedInv.id_actividad) && <div style={{ fontFamily: fontMono, fontSize: '0.68rem', color: textMuted, marginTop: '0.2rem' }}>SCIAN: {String(selectedInv.id_actividad)}</div>}
                     </div>
 
                     {/* Acciones */}
