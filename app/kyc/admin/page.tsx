@@ -489,7 +489,7 @@ export default function KycAdminPage() {
                     <DR l="Nombre" v={selected?.rep_legal_nombre || '—'} />
                     <DR l="CURP" v={selected?.rep_legal_curp || '—'} mono />
                   </Section>
-                  {!!(selected?.metadata?.financiero) {selected?.metadata?.financiero && ({selected?.metadata?.financiero && ( (
+                  {!!(selected?.metadata?.financiero) && ({selected?.metadata?.financiero && ( (
                     <Section title="Perfil Financiero">
                       <DR l="Facturación" v={String((selected.metadata.financiero as Record<string,unknown>)?.nivel_facturacion || '—')} />
                       <DR l="Empleados" v={String((selected.metadata.financiero as Record<string,unknown>)?.num_empleados || '—')} />
