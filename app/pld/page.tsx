@@ -336,6 +336,25 @@ export default function PldPage() {
     init()
   }, [])
 
+  const loadInversionistas = async () => {
+    if (!sessionToken) return
+    setLoading(true)
+    const res = await fetch('/api/v1/pld/inversionistas', { headers: { 'Authorization': 'Bearer ' + sessionToken } })
+    if (res.ok) {
+      const d = await res.json()
+      setInversionistas(d.inversionistas.map((inv: Record<string,unknown>) => ({
+        id: String(inv.id||''),
+        nombre: (() => { const n=String(inv.nombre||''); const ap=String(inv.apellido_paterno||''); const am=String(inv.apellido_materno||''); const full=[n,ap,am].filter(Boolean).join(' ').trim(); return full||String(inv.razon_social||''); })(),
+        rfc: String(inv.rfc||''), tipo: String(inv.tipo_persona||'Fisica'),
+        email: String(inv.email||''), fuente_recursos: String(inv.actividad_economica||''),
+        pais: String(inv.clave_pais||'MEX'), pep: Boolean(inv.pep),
+        nivel_riesgo: (inv.nivel_riesgo as 'bajo'|'medio'|'alto')||'medio',
+        fecha_operacion: String(inv.fecha_operacion||''),
+      })))
+    }
+    setLoading(false)
+  }
+
   const loadSolicitantes = useCallback(async () => {
     if (!sessionToken) return
     const res = await fetch('/api/v1/kyc/admin/empresas', { headers: { 'Authorization': 'Bearer ' + sessionToken } })
