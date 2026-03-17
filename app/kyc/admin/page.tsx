@@ -739,6 +739,5 @@ function DR({ l, v, mono }: { l: string; v: string; mono?: boolean }) {
       <span style={{ color: '#64748B', fontSize: '0.78rem' }}>{l}</span>
       <span style={{ color: '#1E293B', fontSize: '0.8rem', fontWeight: '500', fontFamily: mono ? 'monospace' : 'inherit', maxWidth: '60%', textAlign: 'right' }}>{v}</span>
     </div>
-  </>
   )
 }
