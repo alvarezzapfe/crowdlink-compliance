@@ -1841,7 +1841,7 @@ export default function PldPage() {
               ].map(f => (
                 <div key={f.key}>
                   <label style={{ color: textMuted, fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.08em', display: 'block', marginBottom: '0.35rem' }}>{f.label}</label>
-                  <input value={(newInv as Record<string, string>)[f.key] || ''} onChange={e => setNewInv(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder}
+                  <input value={(newInv as Record<string, unknown>)[f.key] || ''} onChange={e => setNewInv(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder}
                     style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.65rem 0.9rem', color: textPrimary, fontSize: '0.85rem', fontFamily: f.mono ? fontMono : font }} />
                 </div>
               ))}
