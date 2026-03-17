@@ -680,57 +680,96 @@ export default function PldPage() {
                       const wb = XLSX.read(buf, { type: 'array' })
                       const ws = wb.Sheets[wb.SheetNames[0]]
                       const raw = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][]
-                      // Excel has 2 header rows: row[0]=title, row[1]=real headers, row[2+]=data
-                      // Verified column indices from actual file:
                       const fmtDate = (v: unknown) => {
                         if (!v) return ''
-                        const s = String(Math.round(Number(v)))
-                        return s.length===8 ? `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}` : String(v)
+                        const s = String(v).replace(/-/g,'')
+                        if (/^\d{8}$/.test(s)) return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`
+                        return String(v)
                       }
-                      const dataStart = raw.findIndex((r) => {
-                        const row = r as unknown[]
-                        return row[1] && String(row[1]).length === 8 && !String(row[1]).includes('IDENTIFICADOR')
-                      })
-                      const startIdx = dataStart > 0 ? dataStart : 2
+                      // Auto-detect format: clean (ID_CLIENTE header) vs original CNBV (2 header rows)
+                      const hdr0 = (raw[0] as string[]).map(h => String(h||'').toUpperCase().trim())
+                      const isCleanFormat = hdr0[0].includes('ID_CLIENTE') || hdr0[0].includes('ID_FINANCIAMIENTO')
+                      const hdrRow = isCleanFormat ? 0 : (raw.findIndex((r) => (r as string[]).some(c => String(c||'').toUpperCase().includes('TIPO DE PERSONA'))) || 1)
+                      const headers = (raw[hdrRow] as string[]).map(h => String(h||'').toUpperCase().trim())
+                      const H = (name: string) => { const i = headers.findIndex(h => h.includes(name)); return i >= 0 ? i : -1 }
+                      const dataStart = hdrRow + 1
                       const rows = []
-                      for (let i = startIdx; i < raw.length; i++) {
+                      for (let i = dataStart; i < raw.length; i++) {
                         const r = raw[i] as unknown[]
-                        if (!r || !r[1] || String(r[1]).toUpperCase().includes('IDENTIFICADOR')) continue
-                        rows.push({
-                          id_cliente:        String(r[1]||''),
-                          id_financiamiento: String(r[2]||''),
-                          num_cuenta:        String(r[10]||''),
-                          tipo_persona:      Number(r[14])===1 ? 'Física' : 'Moral',
-                          razon_social:      String(r[16]||''),
-                          nombre:            String(r[17]||''),
-                          apellido_paterno:  String(r[18]||''),
-                          apellido_materno:  String(r[19]||''),
-                          genero:            Number(r[20])===1 ? 'M' : 'F',
-                          rfc:               String(r[21]||'').toUpperCase(),
-                          curp:              String(r[22]||'').toUpperCase(),
-                          fecha_nacimiento:  fmtDate(r[23]),
-                          entidad_nacimiento:String(r[24]||''),
-                          clave_pais:        String(r[15]||'260'),
-                          entidad_domicilio: String(r[26]||''),
-                          calle:             String(r[27]||''),
-                          colonia:           String(r[28]||''),
-                          cp:                String(r[31]||''),
-                          ciudad:            String(r[30]||''),
-                          telefono:          String(r[32]||''),
-                          email:             String(r[33]||'').toLowerCase(),
-                          actividad_economica:String(r[34]||''),
-                          id_actividad:      String(r[35]||''),
-                          tipo_operacion:    String(r[36]||'13'),
-                          monto:             Number(r[38]||0),
-                          tipo_inversionista:String(r[40]||''),
-                          moneda:            String(r[42]||'MXN'),
-                          tasa:              Number(r[43]||0),
-                          fecha_operacion:   fmtDate(r[47]),
-                          forma_pago:        String(r[51]||'SPEI'),
-                          grado_riesgo:      String(r[53]||''),
-                          nivel_riesgo:      'medio',
-                          pep:               false,
-                        })
+                        if (!r || !r[H('ID_CLIENTE') >= 0 ? H('ID_CLIENTE') : 1]) continue
+                        if (isCleanFormat) {
+                          // Clean format (inversiones_crowdlink_limpio.xlsx)
+                          rows.push({
+                            id_cliente:         String(r[0]||''),
+                            id_financiamiento:  String(r[1]||''),
+                            num_cuenta:         String(r[2]||''),
+                            tipo_persona:       String(r[3]||'Física'),
+                            razon_social:       String(r[4]||''),
+                            nombre:             String(r[5]||''),
+                            apellido_paterno:   String(r[6]||''),
+                            apellido_materno:   String(r[7]||''),
+                            genero:             String(r[8]||''),
+                            rfc:                String(r[9]||'').toUpperCase(),
+                            curp:               String(r[10]||'').toUpperCase(),
+                            fecha_nacimiento:   String(r[11]||''),
+                            entidad_nacimiento: String(r[12]||''),
+                            clave_pais:         String(r[13]||'260'),
+                            entidad_domicilio:  String(r[14]||''),
+                            calle:              String(r[15]||''),
+                            colonia:            String(r[16]||''),
+                            cp:                 String(r[19]||''),
+                            ciudad:             String(r[18]||''),
+                            telefono:           String(r[20]||''),
+                            email:              String(r[21]||'').toLowerCase(),
+                            actividad_economica:String(r[22]||''),
+                            id_actividad:       String(r[23]||''),
+                            tipo_operacion:     String(r[24]||'13'),
+                            monto:              Number(r[26]||0),
+                            tipo_inversionista: String(r[27]||''),
+                            moneda:             String(r[28]||'MXN'),
+                            tasa:               Number(r[29]||0),
+                            fecha_operacion:    String(r[30]||''),
+                            forma_pago:         String(r[32]||'SPEI'),
+                            grado_riesgo:       String(r[33]||''),
+                            nivel_riesgo:       'medio', pep: false,
+                          })
+                        } else {
+                          // Original CNBV format
+                          rows.push({
+                            id_cliente:         String(r[1]||''),
+                            id_financiamiento:  String(r[2]||''),
+                            num_cuenta:         String(r[10]||''),
+                            tipo_persona:       Number(r[14])===1 ? 'Física' : 'Moral',
+                            razon_social:       String(r[16]||''),
+                            nombre:             String(r[17]||''),
+                            apellido_paterno:   String(r[18]||''),
+                            apellido_materno:   String(r[19]||''),
+                            genero:             Number(r[20])===1 ? 'M' : 'F',
+                            rfc:                String(r[21]||'').toUpperCase(),
+                            curp:               String(r[22]||'').toUpperCase(),
+                            fecha_nacimiento:   fmtDate(r[23]),
+                            entidad_nacimiento: String(r[24]||''),
+                            clave_pais:         String(r[15]||'260'),
+                            entidad_domicilio:  String(r[26]||''),
+                            calle:              String(r[27]||''),
+                            colonia:            String(r[28]||''),
+                            cp:                 String(r[31]||''),
+                            ciudad:             String(r[30]||''),
+                            telefono:           String(r[32]||''),
+                            email:              String(r[33]||'').toLowerCase(),
+                            actividad_economica:String(r[34]||''),
+                            id_actividad:       String(r[35]||''),
+                            tipo_operacion:     String(r[36]||'13'),
+                            monto:              Number(r[38]||0),
+                            tipo_inversionista: String(r[40]||''),
+                            moneda:             String(r[42]||'MXN'),
+                            tasa:               Number(r[43]||0),
+                            fecha_operacion:    fmtDate(r[47]),
+                            forma_pago:         String(r[51]||'SPEI'),
+                            grado_riesgo:       String(r[53]||''),
+                            nivel_riesgo:       'medio', pep: false,
+                          })
+                        }
                       }
                       if (rows.length === 0) { alert('Sin registros encontrados'); setInvLoading(false); return }
                       const res = await fetch('/api/v1/pld/inversionistas', {
