@@ -271,6 +271,7 @@ export default function PldPage() {
   const [inversionistas, setInversionistas] = useState<Inversionista[]>([])
   const [invSearch, setInvSearch] = useState('')
   const [showAddInv, setShowAddInv] = useState(false)
+  const [selectedInv, setSelectedInv] = useState<Record<string,unknown> | null>(null)
   const [newInv, setNewInv] = useState({ nombre: '', rfc: '', tipo: 'persona_fisica', email: '', fuente_recursos: '', pais: 'MX', pep: false })
   const [invSaving, setInvSaving] = useState(false)
 
@@ -725,49 +726,180 @@ export default function PldPage() {
               </svg>
             </div>
 
-            {/* Table */}
-            <div style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: `1px solid ${navyBorder}` }}>
-                    {['Nombre', 'RFC', 'Tipo', 'Email', 'Nivel Riesgo', 'PEP', 'Fecha', ''].map(h => (
-                      <th key={h} style={{ padding: '0.65rem 1rem', textAlign: 'left', color: textMuted, fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.08em' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {inversionistas.filter(i => !invSearch || i.nombre.toLowerCase().includes(invSearch.toLowerCase()) || i.rfc.toLowerCase().includes(invSearch.toLowerCase())).length === 0 ? (
-                    <tr><td colSpan={8} style={{ textAlign: 'center', padding: '3rem', color: textMuted, fontSize: '0.85rem' }}>
-                      {inversionistas.length === 0 ? 'Sin inversionistas registrados. Agrega el primero o carga un Excel.' : 'Sin resultados'}
-                    </td></tr>
-                  ) : inversionistas.filter(i => !invSearch || i.nombre.toLowerCase().includes(invSearch.toLowerCase()) || i.rfc.toLowerCase().includes(invSearch.toLowerCase())).map((inv, idx) => {
-                    const r = RIESGO[inv.nivel_riesgo]
-                    return (
-                      <tr key={inv.id} className="row-hover" style={{ borderBottom: `1px solid ${navyBorder}` }}>
-                        <td style={{ padding: '0.75rem 1rem', color: textPrimary, fontSize: '0.85rem', fontWeight: '500' }}>{inv.nombre}</td>
-                        <td style={{ padding: '0.75rem 1rem' }}><span style={{ fontFamily: fontMono, fontSize: '0.78rem', color: textSecondary, background: 'rgba(255,255,255,0.04)', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>{inv.rfc}</span></td>
-                        <td style={{ padding: '0.75rem 1rem', color: textMuted, fontSize: '0.8rem' }}>{inv.tipo === 'persona_fisica' ? 'Física' : 'Moral'}</td>
-                        <td style={{ padding: '0.75rem 1rem', color: textMuted, fontSize: '0.8rem' }}>{inv.email}</td>
-                        <td style={{ padding: '0.75rem 1rem' }}>
-                          <span style={{ background: r.bg, color: r.color, fontSize: '0.68rem', fontWeight: '600', padding: '0.2rem 0.6rem', borderRadius: '9999px', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                            <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: r.dot }} />{r.label}
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem' }}>
-                          {inv.pep ? <span style={{ background: 'rgba(239,68,68,0.1)', color: accentRed, fontSize: '0.65rem', fontWeight: '700', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>PEP</span> : <span style={{ color: textMuted, fontSize: '0.75rem' }}>—</span>}
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', color: textMuted, fontSize: '0.75rem' }}>{inv.fecha_operacion || (inv.created_at ? new Date(inv.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : '—')}</td>
-                        <td style={{ padding: '0.75rem 1rem' }}>
-                          <button onClick={() => { setListaQuery(inv.nombre); setListaRfc(inv.rfc); setSection('listas') }}
-                            style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '6px', padding: '0.3rem 0.6rem', fontSize: '0.7rem', color: '#60A5FA', cursor: 'pointer', fontFamily: font }}>
-                            Consultar listas
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+            {/* Stats strip */}
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
+              {[
+                { l: 'Total', v: inversionistas.length, c: accent },
+                { l: 'Largo plazo', v: inversionistas.filter((i: Inversionista) => (i as unknown as Record<string,unknown>).tipo_inversionista === 'LARGO').length, c: accentGreen },
+                { l: 'Corto plazo', v: inversionistas.filter((i: Inversionista) => (i as unknown as Record<string,unknown>).tipo_inversionista === 'CORTO').length, c: accentYellow },
+                { l: 'PEP', v: inversionistas.filter((i: Inversionista) => i.pep).length, c: accentRed },
+              ].map(s => (
+                <div key={s.l} style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.6rem 1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <span style={{ color: s.c, fontSize: '1.1rem', fontWeight: '700', fontFamily: fontMono }}>{s.v}</span>
+                  <span style={{ color: textMuted, fontSize: '0.72rem' }}>{s.l}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Table + slide-in detail */}
+            <div style={{ display: 'grid', gridTemplateColumns: selectedInv ? '1fr 380px' : '1fr', gap: '1rem', alignItems: 'start' }}>
+
+              {/* Table */}
+              <div style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: `1px solid ${navyBorder}` }}>
+                      {['Inversionista', 'RFC', 'T.P.', 'Monto op.', 'Plazo', 'Tasa', 'F. operación', 'Riesgo', ''].map(h => (
+                        <th key={h} style={{ padding: '0.6rem 0.85rem', textAlign: 'left', color: textMuted, fontSize: '0.65rem', fontWeight: '600', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inversionistas.filter((i: Inversionista) => !invSearch || i.nombre.toLowerCase().includes(invSearch.toLowerCase()) || i.rfc.toLowerCase().includes(invSearch.toLowerCase())).length === 0 ? (
+                      <tr><td colSpan={9} style={{ textAlign: 'center', padding: '3rem', color: textMuted, fontSize: '0.85rem' }}>
+                        {inversionistas.length === 0 ? 'Sin inversionistas. Carga un Excel o agrega manualmente.' : 'Sin resultados'}
+                      </td></tr>
+                    ) : inversionistas.filter((i: Inversionista) => !invSearch || i.nombre.toLowerCase().includes(invSearch.toLowerCase()) || i.rfc.toLowerCase().includes(invSearch.toLowerCase())).map((inv: Inversionista) => {
+                      const ri = inv as unknown as Record<string,unknown>
+                      const r = RIESGO[inv.nivel_riesgo]
+                      const isSelected = (selectedInv as Record<string,unknown>)?.id === ri.id
+                      return (
+                        <tr key={String(ri.id)} onClick={() => setSelectedInv(isSelected ? null : ri)}
+                          style={{ borderBottom: `1px solid ${navyBorder}`, cursor: 'pointer', background: isSelected ? 'rgba(59,130,246,0.06)' : 'transparent', transition: 'background 0.1s' }}>
+                          <td style={{ padding: '0.65rem 0.85rem' }}>
+                            <div style={{ color: textPrimary, fontWeight: '500', fontSize: '0.82rem' }}>{inv.nombre}</div>
+                            <div style={{ color: textMuted, fontSize: '0.68rem' }}>{inv.email}</div>
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem' }}>
+                            <span style={{ fontFamily: fontMono, fontSize: '0.73rem', color: textSecondary, background: 'rgba(255,255,255,0.04)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>{inv.rfc}</span>
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem', color: textMuted, fontSize: '0.75rem' }}>
+                            {inv.tipo === 'persona_fisica' || inv.tipo === 'Física' ? 'Fís.' : 'Mor.'}
+                            {inv.pep && <span style={{ marginLeft: '4px', background: 'rgba(239,68,68,0.15)', color: accentRed, fontSize: '0.6rem', fontWeight: '700', padding: '0.1rem 0.35rem', borderRadius: '3px' }}>PEP</span>}
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem', fontFamily: fontMono, fontSize: '0.78rem', color: textPrimary }}>
+                            {ri.monto ? new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(Number(ri.monto)) : '—'}
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem' }}>
+                            {ri.tipo_inversionista ? (
+                              <span style={{ fontSize: '0.65rem', fontWeight: '600', padding: '0.15rem 0.5rem', borderRadius: '9999px',
+                                background: ri.tipo_inversionista === 'LARGO' ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.1)',
+                                color: ri.tipo_inversionista === 'LARGO' ? accentGreen : accent }}>
+                                {String(ri.tipo_inversionista)}
+                              </span>
+                            ) : <span style={{ color: textMuted }}>—</span>}
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem', fontFamily: fontMono, fontSize: '0.75rem', color: textSecondary }}>
+                            {ri.tasa ? `${(Number(ri.tasa)*100).toFixed(1)}%` : '—'}
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem', color: textMuted, fontSize: '0.73rem', fontFamily: fontMono }}>
+                            {String(ri.fecha_operacion || '—')}
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem' }}>
+                            <span style={{ background: r.bg, color: r.color, fontSize: '0.65rem', fontWeight: '600', padding: '0.15rem 0.55rem', borderRadius: '9999px', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: r.dot }} />{r.label}
+                            </span>
+                          </td>
+                          <td style={{ padding: '0.65rem 0.85rem' }}>
+                            <button onClick={e => { e.stopPropagation(); setListaQuery(inv.nombre); setListaRfc(inv.rfc); setSection('listas') }}
+                              style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '6px', padding: '0.25rem 0.55rem', fontSize: '0.68rem', color: '#60A5FA', cursor: 'pointer', fontFamily: font, whiteSpace: 'nowrap' }}>
+                              Consultar →
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Detail panel */}
+              {selectedInv && (
+                <div style={{ background: navyLight, border: `1px solid ${navyBorder}`, borderRadius: '12px', overflow: 'hidden', animation: 'slideIn 0.2s ease', position: 'sticky', top: '1rem' }}>
+                  <div style={{ padding: '1rem 1.25rem', borderBottom: `1px solid ${navyBorder}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ color: textPrimary, fontSize: '0.9rem', fontWeight: '600', marginBottom: '0.1rem' }}>{String(selectedInv.razon_social || `${selectedInv.nombre||''} ${selectedInv.apellido_paterno||''} ${selectedInv.apellido_materno||''}`.trim())}</div>
+                      <div style={{ fontFamily: fontMono, fontSize: '0.72rem', color: textMuted }}>{String(selectedInv.rfc||'')}</div>
+                    </div>
+                    <button onClick={() => setSelectedInv(null)} style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${navyBorder}`, borderRadius: '5px', width: '26px', height: '26px', cursor: 'pointer', color: textSecondary, fontFamily: font, fontSize: '0.75rem' }}>✕</button>
+                  </div>
+
+                  {/* Tabs content */}
+                  <div style={{ padding: '1rem 1.25rem', display: 'grid', gap: '1rem' }}>
+
+                    {/* Identity */}
+                    <div>
+                      <div style={{ color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>IDENTIDAD</div>
+                      <div style={{ display: 'grid', gap: '0.3rem' }}>
+                        {[
+                          ['CURP', String(selectedInv.curp||'—')],
+                          ['F. nacimiento', String(selectedInv.fecha_nacimiento||'—')],
+                          ['Entidad nac.', String(selectedInv.entidad_nacimiento||'—')],
+                          ['Género', selectedInv.genero === 'M' ? 'Masculino' : selectedInv.genero === 'F' ? 'Femenino' : '—'],
+                          ['Tipo persona', String(selectedInv.tipo_persona||'—')],
+                          ['País', String(selectedInv.clave_pais||'—')],
+                        ].map(([l,v]) => (
+                          <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.3rem 0', borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                            <span style={{ color: textMuted, fontSize: '0.72rem' }}>{l}</span>
+                            <span style={{ color: textSecondary, fontSize: '0.72rem', fontFamily: l === 'CURP' ? fontMono : font, textAlign: 'right', maxWidth: '60%' }}>{v}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Domicilio */}
+                    <div>
+                      <div style={{ color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>DOMICILIO</div>
+                      <div style={{ color: textSecondary, fontSize: '0.75rem', lineHeight: 1.6 }}>
+                        {[selectedInv.calle, selectedInv.colonia, selectedInv.cp ? `C.P. ${selectedInv.cp}` : null].filter(Boolean).join(', ') || '—'}
+                      </div>
+                      <div style={{ color: textMuted, fontSize: '0.7rem', marginTop: '0.25rem' }}>{String(selectedInv.telefono||'')} · {String(selectedInv.email||'')}</div>
+                    </div>
+
+                    {/* Operación */}
+                    <div>
+                      <div style={{ color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>OPERACIÓN</div>
+                      <div style={{ display: 'grid', gap: '0.3rem' }}>
+                        {[
+                          ['Monto', selectedInv.monto ? new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN',maximumFractionDigits:0}).format(Number(selectedInv.monto)) : '—'],
+                          ['Moneda', String(selectedInv.moneda||'MXN')],
+                          ['Tasa', selectedInv.tasa ? `${(Number(selectedInv.tasa)*100).toFixed(2)}%` : '—'],
+                          ['Tipo inv.', String(selectedInv.tipo_inversionista||'—')],
+                          ['Forma pago', String(selectedInv.forma_pago||'—')],
+                          ['F. operación', String(selectedInv.fecha_operacion||'—')],
+                          ['ID cliente', String(selectedInv.id_cliente||'—')],
+                          ['ID financ.', String(selectedInv.id_financiamiento||'—')],
+                          ['Num. cuenta', String(selectedInv.num_cuenta||'—')],
+                        ].map(([l,v]) => (
+                          <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.3rem 0', borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                            <span style={{ color: textMuted, fontSize: '0.72rem' }}>{l}</span>
+                            <span style={{ color: textSecondary, fontSize: '0.72rem', fontFamily: ['ID cliente','ID financ.','Num. cuenta'].includes(String(l)) ? fontMono : font }}>{v}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Actividad económica */}
+                    <div>
+                      <div style={{ color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.08em', marginBottom: '0.4rem' }}>ACTIVIDAD ECONÓMICA</div>
+                      <div style={{ color: textSecondary, fontSize: '0.75rem', lineHeight: 1.5 }}>{String(selectedInv.actividad_economica||'—')}</div>
+                      {selectedInv.id_actividad && <div style={{ fontFamily: fontMono, fontSize: '0.68rem', color: textMuted, marginTop: '0.2rem' }}>SCIAN: {String(selectedInv.id_actividad)}</div>}
+                    </div>
+
+                    {/* Acciones */}
+                    <div style={{ display: 'grid', gap: '0.5rem', paddingTop: '0.25rem' }}>
+                      <button onClick={() => { setListaQuery(String(selectedInv.razon_social||`${selectedInv.nombre||''} ${selectedInv.apellido_paterno||''}`.trim())); setListaRfc(String(selectedInv.rfc||'')); setSection('listas') }}
+                        style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: '8px', padding: '0.6rem', fontSize: '0.78rem', color: '#60A5FA', cursor: 'pointer', fontFamily: font, fontWeight: '500', textAlign: 'center' }}>
+                        Consultar en listas OFAC/SAT/UIF →
+                      </button>
+                      <button onClick={() => { setSection('reportes') }}
+                        style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: '8px', padding: '0.6rem', fontSize: '0.78rem', color: accentGreen, cursor: 'pointer', fontFamily: font, fontWeight: '500', textAlign: 'center' }}>
+                        Generar reporte CNBV para este inv. →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
