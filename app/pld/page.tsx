@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import React from 'react'
 
@@ -342,6 +342,7 @@ export default function PldPage() {
   }, [sessionToken])
 
   useEffect(() => {
+    if (section === 'inversionistas' && sessionToken) loadInversionistas()
     if (section === 'solicitantes' && sessionToken) loadSolicitantes()
     if (section === 'reportes' && sessionToken) loadReportes()
     if (section === 'auditoria' && sessionToken) loadAuditorias()
@@ -421,8 +422,8 @@ export default function PldPage() {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionToken },
       body: JSON.stringify({ id, status })
     })
-    setAuditorias(p => p.map(a => ({ ...a, pld_auditoria_hallazgos: a.pld_auditoria_hallazgos?.map(h => h.id === id ? { ...h, status: status as Hallazgo['status'] } : h) })) as Auditoria[])
-    setSelectedAuditoria(prev => prev ? { ...prev, pld_auditoria_hallazgos: prev.pld_auditoria_hallazgos?.map(h => h.id === id ? { ...h, status: status as Hallazgo['status'] } : h) } : prev)
+    setAuditorias(p => p.map(a => ({ ...a, pld_auditoria_hallazgos: a.pld_auditoria_hallazgos?.map(h => h.id === id ? { ...h, status } : h) })))
+    setSelectedAuditoria(prev => prev ? { ...prev, pld_auditoria_hallazgos: prev.pld_auditoria_hallazgos?.map(h => h.id === id ? { ...h, status } : h) } : prev)
   }
 
   const resetInactivityTimer = useCallback(() => {
@@ -652,7 +653,60 @@ export default function PldPage() {
               </div>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <label style={{ background: 'rgba(59,130,246,0.08)', border: `1px solid rgba(59,130,246,0.25)`, borderRadius: '8px', padding: '0.5rem 1rem', fontSize: '0.82rem', color: '#60A5FA', cursor: 'pointer', fontFamily: font, fontWeight: '500' }}>
-                  <input type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={() => alert('Carga masiva — integración Excel próximamente')} />
+                  <input type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    setInvLoading(true)
+                    try {
+                      const buf = await file.arrayBuffer()
+                      const wb = XLSX.read(buf, { type: 'array' })
+                      const ws = wb.Sheets[wb.SheetNames[0]]
+                      const raw = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][]
+                      let hdrIdx = 0
+                      for (let i = 0; i < Math.min(5, raw.length); i++) {
+                        const r = raw[i] as string[]
+                        if (r.some(c => String(c||'').toUpperCase().includes('IDENTIFICADOR') || String(c||'').toUpperCase().includes('TIPO DE CLIENTE'))) { hdrIdx = i; break }
+                      }
+                      const headers = (raw[hdrIdx] as string[]).map(h => String(h||'').trim().toUpperCase())
+                      const H = (name: string) => headers.findIndex(h => h.includes(name))
+                      const fmtDate = (v: unknown) => { if (!v) return ''; const s = String(Math.round(Number(v))); return s.length===8?`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`:String(v) }
+                      const rows = []
+                      for (let i = hdrIdx + 1; i < raw.length; i++) {
+                        const r = raw[i] as unknown[]
+                        if (!r || !r[1]) continue
+                        rows.push({
+                          id_cliente: String(r[H('IDENTIFICADOR DEL CLIENTE')+1>=1?H('IDENTIFICADOR DEL CLIENTE'):1]||''),
+                          id_financiamiento: String(r[H('IDENTIFICADOR DEL FINANC')+1>=1?H('IDENTIFICADOR DEL FINANC'):2]||''),
+                          num_cuenta: String(r[10]||''),
+                          tipo_persona: r[14]==1?'Física':'Moral',
+                          razon_social: String(r[16]||`${r[17]||''} ${r[18]||''} ${r[19]||''}`.trim()),
+                          nombre: String(r[17]||''), apellido_paterno: String(r[18]||''), apellido_materno: String(r[19]||''),
+                          genero: r[20]==1?'M':'F',
+                          rfc: String(r[21]||'').toUpperCase(), curp: String(r[22]||'').toUpperCase(),
+                          fecha_nacimiento: fmtDate(r[23]), entidad_nacimiento: String(r[24]||''),
+                          clave_pais: String(r[15]||'260'), entidad_domicilio: String(r[26]||''),
+                          calle: String(r[27]||''), colonia: String(r[28]||''), cp: String(r[31]||''), ciudad: String(r[30]||''),
+                          telefono: String(r[32]||''), email: String(r[33]||'').toLowerCase(),
+                          actividad_economica: String(r[34]||''), id_actividad: String(r[35]||''),
+                          tipo_operacion: String(r[36]||'2'),
+                          monto: Number(r[38]||0), tipo_inversionista: String(r[40]||''),
+                          moneda: String(r[42]||'MXN'), tasa: Number(r[43]||0.055),
+                          fecha_operacion: fmtDate(r[47]), forma_pago: String(r[51]||'SPEI'),
+                          grado_riesgo: String(r[53]||''), nivel_riesgo: 'medio', pep: false,
+                        })
+                      }
+                      if (rows.length === 0) { alert('Sin registros encontrados'); setInvLoading(false); return }
+                      const res = await fetch('/api/v1/pld/inversionistas', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionToken },
+                        body: JSON.stringify({ rows })
+                      })
+                      const d = await res.json()
+                      if (res.ok) { alert(`✓ ${d.inserted} inversionistas importados`); loadInversionistas() }
+                      else alert('Error: ' + d.error)
+                    } catch(err) { alert('Error al procesar: ' + String(err)) }
+                    setInvLoading(false); e.target.value = ''
+                  }} />
                   ↑ Cargar Excel
                 </label>
                 <button onClick={() => setShowAddInv(true)}
@@ -1579,7 +1633,7 @@ export default function PldPage() {
               ].map(f => (
                 <div key={f.key}>
                   <label style={{ color: textMuted, fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.08em', display: 'block', marginBottom: '0.35rem' }}>{f.label}</label>
-                  <input value={String((newInv as Record<string, unknown>)[f.key] || '')} onChange={e => setNewInv(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder}
+                  <input value={(newInv as Record<string, string>)[f.key] || ''} onChange={e => setNewInv(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder}
                     style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.65rem 0.9rem', color: textPrimary, fontSize: '0.85rem', fontFamily: f.mono ? fontMono : font }} />
                 </div>
               ))}
