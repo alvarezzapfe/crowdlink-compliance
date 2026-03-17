@@ -1,6 +1,5 @@
 'use client'
-import * as XLSX from 'xlsx'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import React from 'react'
 
@@ -336,22 +335,6 @@ export default function PldPage() {
     init()
   }, [])
 
-  const loadInversionistas = async () => {
-    if (!sessionToken) return
-    setLoading(true)
-    const res = await fetch('/api/v1/pld/inversionistas', { headers: { 'Authorization': 'Bearer ' + sessionToken } })
-    if (res.ok) {
-      const d = await res.json()
-      setInversionistas(d.inversionistas.map((inv: Record<string,unknown>) => ({
-        id: String(inv.id||''), nombre: String(inv.razon_social||(String(inv.nombre||'')+' '+String(inv.apellido_paterno||'')+' '+String(inv.apellido_materno||'')).trim()),
-        rfc: String(inv.rfc||''), tipo: String(inv.tipo_persona||'Fisica'), email: String(inv.email||''),
-        fuente_recursos: String(inv.actividad_economica||''), pais: String(inv.clave_pais||'MEX'),
-        pep: Boolean(inv.pep), nivel_riesgo: (inv.nivel_riesgo as 'bajo'|'medio'|'alto')||'medio',
-      })))
-    }
-    setLoading(false)
-  }
-
   const loadSolicitantes = useCallback(async () => {
     if (!sessionToken) return
     const res = await fetch('/api/v1/kyc/admin/empresas', { headers: { 'Authorization': 'Bearer ' + sessionToken } })
@@ -673,7 +656,7 @@ export default function PldPage() {
                   <input type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={async (e) => {
                     const file = e.target.files?.[0]
                     if (!file) return
-                    setLoading(true)
+                    setInvLoading(true)
                     try {
                       const buf = await file.arrayBuffer()
                       const wb = XLSX.read(buf, { type: 'array' })
@@ -695,8 +678,8 @@ export default function PldPage() {
                           id_cliente: String(r[H('IDENTIFICADOR DEL CLIENTE')+1>=1?H('IDENTIFICADOR DEL CLIENTE'):1]||''),
                           id_financiamiento: String(r[H('IDENTIFICADOR DEL FINANC')+1>=1?H('IDENTIFICADOR DEL FINANC'):2]||''),
                           num_cuenta: String(r[10]||''),
-                          tipo_persona: r[14]==1?'Física':'Moral',
-                          razon_social: String(r[16]||`${r[17]||''} ${r[18]||''} ${r[19]||''}`.trim()),
+                          tipo_persona: Number(r[14])===1?'Física':'Moral',
+                          razon_social: String(r[16]||''),
                           nombre: String(r[17]||''), apellido_paterno: String(r[18]||''), apellido_materno: String(r[19]||''),
                           genero: r[20]==1?'M':'F',
                           rfc: String(r[21]||'').toUpperCase(), curp: String(r[22]||'').toUpperCase(),
@@ -712,7 +695,7 @@ export default function PldPage() {
                           grado_riesgo: String(r[53]||''), nivel_riesgo: 'medio', pep: false,
                         })
                       }
-                      if (rows.length === 0) { alert('Sin registros encontrados'); setLoading(false); return }
+                      if (rows.length === 0) { alert('Sin registros encontrados'); setInvLoading(false); return }
                       const res = await fetch('/api/v1/pld/inversionistas', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionToken },
@@ -722,7 +705,7 @@ export default function PldPage() {
                       if (res.ok) { alert(`✓ ${d.inserted} inversionistas importados`); loadInversionistas() }
                       else alert('Error: ' + d.error)
                     } catch(err) { alert('Error al procesar: ' + String(err)) }
-                    setLoading(false); e.target.value = ''
+                    setInvLoading(false); e.target.value = ''
                   }} />
                   ↑ Cargar Excel
                 </label>
@@ -773,7 +756,7 @@ export default function PldPage() {
                         <td style={{ padding: '0.75rem 1rem' }}>
                           {inv.pep ? <span style={{ background: 'rgba(239,68,68,0.1)', color: accentRed, fontSize: '0.65rem', fontWeight: '700', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>PEP</span> : <span style={{ color: textMuted, fontSize: '0.75rem' }}>—</span>}
                         </td>
-                        <td style={{ padding: '0.75rem 1rem', color: textMuted, fontSize: '0.75rem' }}>{new Date(inv.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}</td>
+                        <td style={{ padding: '0.75rem 1rem', color: textMuted, fontSize: '0.75rem' }}>{inv.fecha_operacion || (inv.created_at ? new Date(inv.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }) : '—')}</td>
                         <td style={{ padding: '0.75rem 1rem' }}>
                           <button onClick={() => { setListaQuery(inv.nombre); setListaRfc(inv.rfc); setSection('listas') }}
                             style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '6px', padding: '0.3rem 0.6rem', fontSize: '0.7rem', color: '#60A5FA', cursor: 'pointer', fontFamily: font }}>
@@ -1650,7 +1633,7 @@ export default function PldPage() {
               ].map(f => (
                 <div key={f.key}>
                   <label style={{ color: textMuted, fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.08em', display: 'block', marginBottom: '0.35rem' }}>{f.label}</label>
-                  <input value={String((newInv as Record<string, unknown>)[f.key] || '')} onChange={e => setNewInv(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder}
+                  <input value={(newInv as Record<string, string>)[f.key] || ''} onChange={e => setNewInv(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder}
                     style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.65rem 0.9rem', color: textPrimary, fontSize: '0.85rem', fontFamily: f.mono ? fontMono : font }} />
                 </div>
               ))}
