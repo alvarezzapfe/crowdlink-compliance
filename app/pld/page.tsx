@@ -337,7 +337,7 @@ export default function PldPage() {
 
   const loadInversionistas = async () => {
     if (!sessionToken) return
-    setInvLoading(true)
+    setLoading(true)
     const res = await fetch('/api/v1/pld/inversionistas', { headers: { 'Authorization': 'Bearer ' + sessionToken } })
     if (res.ok) {
       const d = await res.json()
@@ -348,7 +348,7 @@ export default function PldPage() {
         pep: Boolean(inv.pep), nivel_riesgo: (inv.nivel_riesgo as 'bajo'|'medio'|'alto')||'medio',
       })))
     }
-    setInvLoading(false)
+    setLoading(false)
   }
 
   const loadSolicitantes = useCallback(async () => {
@@ -672,7 +672,7 @@ export default function PldPage() {
                   <input type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={async (e) => {
                     const file = e.target.files?.[0]
                     if (!file) return
-                    setInvLoading(true)
+                    setLoading(true)
                     try {
                       const buf = await file.arrayBuffer()
                       const wb = XLSX.read(buf, { type: 'array' })
@@ -711,7 +711,7 @@ export default function PldPage() {
                           grado_riesgo: String(r[53]||''), nivel_riesgo: 'medio', pep: false,
                         })
                       }
-                      if (rows.length === 0) { alert('Sin registros encontrados'); setInvLoading(false); return }
+                      if (rows.length === 0) { alert('Sin registros encontrados'); setLoading(false); return }
                       const res = await fetch('/api/v1/pld/inversionistas', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionToken },
@@ -721,7 +721,7 @@ export default function PldPage() {
                       if (res.ok) { alert(`✓ ${d.inserted} inversionistas importados`); loadInversionistas() }
                       else alert('Error: ' + d.error)
                     } catch(err) { alert('Error al procesar: ' + String(err)) }
-                    setInvLoading(false); e.target.value = ''
+                    setLoading(false); e.target.value = ''
                   }} />
                   ↑ Cargar Excel
                 </label>
