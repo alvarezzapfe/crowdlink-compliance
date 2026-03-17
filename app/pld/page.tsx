@@ -1,5 +1,4 @@
 'use client'
-import * as XLSX from 'xlsx'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import React from 'react'
@@ -344,12 +343,10 @@ export default function PldPage() {
     if (res.ok) {
       const d = await res.json()
       setInversionistas(d.inversionistas.map((inv: Record<string,unknown>) => ({
-        id: String(inv.id||''),
-        nombre: (() => { const n=String(inv.nombre||''); const ap=String(inv.apellido_paterno||''); const am=String(inv.apellido_materno||''); const full=[n,ap,am].filter(Boolean).join(' ').trim(); return full||String(inv.razon_social||''); })(),
-        rfc: String(inv.rfc||''), tipo: String(inv.tipo_persona||'Fisica'),
-        email: String(inv.email||''), fuente_recursos: String(inv.actividad_economica||''),
-        pais: String(inv.clave_pais||'MEX'), pep: Boolean(inv.pep),
-        nivel_riesgo: (inv.nivel_riesgo as 'bajo'|'medio'|'alto')||'medio',
+        id: String(inv.id||''), nombre: (() => { const n=String(inv.nombre||''); const ap=String(inv.apellido_paterno||''); const am=String(inv.apellido_materno||''); const full=[n,ap,am].filter(Boolean).join(' ').trim(); return full||String(inv.razon_social||''); })(),
+        rfc: String(inv.rfc||''), tipo: String(inv.tipo_persona||'Fisica'), email: String(inv.email||''),
+        fuente_recursos: String(inv.actividad_economica||''), pais: String(inv.clave_pais||'MEX'),
+        pep: Boolean(inv.pep), nivel_riesgo: (inv.nivel_riesgo as 'bajo'|'medio'|'alto')||'medio',
         fecha_operacion: String(inv.fecha_operacion||''),
       })))
     }
@@ -677,46 +674,65 @@ export default function PldPage() {
                   <input type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={async (e) => {
                     const file = e.target.files?.[0]
                     if (!file) return
-                    setLoading(true)
+                    setInvLoading(true)
                     try {
                       const buf = await file.arrayBuffer()
                       const wb = XLSX.read(buf, { type: 'array' })
                       const ws = wb.Sheets[wb.SheetNames[0]]
                       const raw = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown[][]
-                      let hdrIdx = 0
-                      for (let i = 0; i < Math.min(5, raw.length); i++) {
-                        const r = raw[i] as string[]
-                        if (r.some(c => String(c||'').toUpperCase().includes('IDENTIFICADOR') || String(c||'').toUpperCase().includes('TIPO DE CLIENTE'))) { hdrIdx = i; break }
+                      // Excel has 2 header rows: row[0]=title, row[1]=real headers, row[2+]=data
+                      // Verified column indices from actual file:
+                      const fmtDate = (v: unknown) => {
+                        if (!v) return ''
+                        const s = String(Math.round(Number(v)))
+                        return s.length===8 ? `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}` : String(v)
                       }
-                      const headers = (raw[hdrIdx] as string[]).map(h => String(h||'').trim().toUpperCase())
-                      const H = (name: string) => headers.findIndex(h => h.includes(name))
-                      const fmtDate = (v: unknown) => { if (!v) return ''; const s = String(Math.round(Number(v))); return s.length===8?`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`:String(v) }
+                      const dataStart = raw.findIndex((r) => {
+                        const row = r as unknown[]
+                        return row[1] && String(row[1]).length === 8 && !String(row[1]).includes('IDENTIFICADOR')
+                      })
+                      const startIdx = dataStart > 0 ? dataStart : 2
                       const rows = []
-                      for (let i = hdrIdx + 1; i < raw.length; i++) {
+                      for (let i = startIdx; i < raw.length; i++) {
                         const r = raw[i] as unknown[]
-                        if (!r || !r[1]) continue
+                        if (!r || !r[1] || String(r[1]).toUpperCase().includes('IDENTIFICADOR')) continue
                         rows.push({
-                          id_cliente: String(r[H('IDENTIFICADOR DEL CLIENTE')+1>=1?H('IDENTIFICADOR DEL CLIENTE'):1]||''),
-                          id_financiamiento: String(r[H('IDENTIFICADOR DEL FINANC')+1>=1?H('IDENTIFICADOR DEL FINANC'):2]||''),
-                          num_cuenta: String(r[10]||''),
-                          tipo_persona: Number(r[14])===1?'Física':'Moral',
-                          razon_social: String(r[16]||''),
-                          nombre: String(r[17]||''), apellido_paterno: String(r[18]||''), apellido_materno: String(r[19]||''),
-                          genero: r[20]==1?'M':'F',
-                          rfc: String(r[21]||'').toUpperCase(), curp: String(r[22]||'').toUpperCase(),
-                          fecha_nacimiento: fmtDate(r[23]), entidad_nacimiento: String(r[24]||''),
-                          clave_pais: String(r[15]||'260'), entidad_domicilio: String(r[26]||''),
-                          calle: String(r[27]||''), colonia: String(r[28]||''), cp: String(r[31]||''), ciudad: String(r[30]||''),
-                          telefono: String(r[32]||''), email: String(r[33]||'').toLowerCase(),
-                          actividad_economica: String(r[34]||''), id_actividad: String(r[35]||''),
-                          tipo_operacion: String(r[36]||'2'),
-                          monto: Number(r[38]||0), tipo_inversionista: String(r[40]||''),
-                          moneda: String(r[42]||'MXN'), tasa: Number(r[43]||0.055),
-                          fecha_operacion: fmtDate(r[47]), forma_pago: String(r[51]||'SPEI'),
-                          grado_riesgo: String(r[53]||''), nivel_riesgo: 'medio', pep: false,
+                          id_cliente:        String(r[1]||''),
+                          id_financiamiento: String(r[2]||''),
+                          num_cuenta:        String(r[10]||''),
+                          tipo_persona:      Number(r[14])===1 ? 'Física' : 'Moral',
+                          razon_social:      String(r[16]||''),
+                          nombre:            String(r[17]||''),
+                          apellido_paterno:  String(r[18]||''),
+                          apellido_materno:  String(r[19]||''),
+                          genero:            Number(r[20])===1 ? 'M' : 'F',
+                          rfc:               String(r[21]||'').toUpperCase(),
+                          curp:              String(r[22]||'').toUpperCase(),
+                          fecha_nacimiento:  fmtDate(r[23]),
+                          entidad_nacimiento:String(r[24]||''),
+                          clave_pais:        String(r[15]||'260'),
+                          entidad_domicilio: String(r[26]||''),
+                          calle:             String(r[27]||''),
+                          colonia:           String(r[28]||''),
+                          cp:                String(r[31]||''),
+                          ciudad:            String(r[30]||''),
+                          telefono:          String(r[32]||''),
+                          email:             String(r[33]||'').toLowerCase(),
+                          actividad_economica:String(r[34]||''),
+                          id_actividad:      String(r[35]||''),
+                          tipo_operacion:    String(r[36]||'13'),
+                          monto:             Number(r[38]||0),
+                          tipo_inversionista:String(r[40]||''),
+                          moneda:            String(r[42]||'MXN'),
+                          tasa:              Number(r[43]||0),
+                          fecha_operacion:   fmtDate(r[47]),
+                          forma_pago:        String(r[51]||'SPEI'),
+                          grado_riesgo:      String(r[53]||''),
+                          nivel_riesgo:      'medio',
+                          pep:               false,
                         })
                       }
-                      if (rows.length === 0) { alert('Sin registros encontrados'); setLoading(false); return }
+                      if (rows.length === 0) { alert('Sin registros encontrados'); setInvLoading(false); return }
                       const res = await fetch('/api/v1/pld/inversionistas', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sessionToken },
@@ -726,7 +742,7 @@ export default function PldPage() {
                       if (res.ok) { alert(`✓ ${d.inserted} inversionistas importados`); loadInversionistas() }
                       else alert('Error: ' + d.error)
                     } catch(err) { alert('Error al procesar: ' + String(err)) }
-                    setLoading(false); e.target.value = ''
+                    setInvLoading(false); e.target.value = ''
                   }} />
                   ↑ Cargar Excel
                 </label>
@@ -903,7 +919,7 @@ export default function PldPage() {
                     <div>
                       <div style={{ color: textMuted, fontSize: '0.62rem', fontWeight: '600', letterSpacing: '0.08em', marginBottom: '0.4rem' }}>ACTIVIDAD ECONÓMICA</div>
                       <div style={{ color: textSecondary, fontSize: '0.75rem', lineHeight: 1.5 }}>{String(selectedInv.actividad_economica||'—')}</div>
-                      {!!(selectedInv.id_actividad) && <div style={{ fontFamily: fontMono, fontSize: '0.68rem', color: textMuted, marginTop: '0.2rem' }}>SCIAN: {String(selectedInv.id_actividad)}</div>}
+                      {selectedInv.id_actividad && <div style={{ fontFamily: fontMono, fontSize: '0.68rem', color: textMuted, marginTop: '0.2rem' }}>SCIAN: {String(selectedInv.id_actividad)}</div>}
                     </div>
 
                     {/* Acciones */}
@@ -1785,7 +1801,7 @@ export default function PldPage() {
               ].map(f => (
                 <div key={f.key}>
                   <label style={{ color: textMuted, fontSize: '0.68rem', fontWeight: '600', letterSpacing: '0.08em', display: 'block', marginBottom: '0.35rem' }}>{f.label}</label>
-                  <input value={String((newInv as Record<string, unknown>)[f.key] || '')} onChange={e => setNewInv(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder}
+                  <input value={(newInv as Record<string, string>)[f.key] || ''} onChange={e => setNewInv(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder={f.placeholder}
                     style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${navyBorder}`, borderRadius: '8px', padding: '0.65rem 0.9rem', color: textPrimary, fontSize: '0.85rem', fontFamily: f.mono ? fontMono : font }} />
                 </div>
               ))}
