@@ -6,8 +6,8 @@ import React from 'react'
 
 type State = 'loading' | 'valid' | 'used' | 'expired' | 'invalid' | 'error'
 
-export default function InvitePage({ params }: { params: Promise<{ token: string }> }) {
-  const { token: tokenParam } = React.use(params)
+export default function InvitePage({ params }: { params: { token: string } }) {
+  const tokenParam = params.token
   const [state, setState] = useState<State>('loading')
   const [invitation, setInvitation] = useState<{ email: string; nombre_empresa: string } | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
