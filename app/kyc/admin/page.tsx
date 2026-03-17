@@ -1,5 +1,5 @@
 'use client'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import { cl, statusConfig } from '@/lib/design'
 import {
@@ -199,7 +199,21 @@ export default function KycAdminPage() {
   const filtered = empresas.filter(e => {
     if (filter !== 'all' && e.status !== filter) return false
     if (!search) return true
-    // Inactivity timeout — 30 min
+    return (e.razon_social || '').toLowerCase().includes(search.toLowerCase()) ||
+           (e.rfc || '').toLowerCase().includes(search.toLowerCase()) ||
+           (e.giro || '').toLowerCase().includes(search.toLowerCase())
+  })
+
+  const counts = {
+    all: empresas.length,
+    pending: empresas.filter(e => e.status === 'pending').length,
+    in_review: empresas.filter(e => e.status === 'in_review').length,
+    approved: empresas.filter(e => e.status === 'approved').length,
+    rejected: empresas.filter(e => e.status === 'rejected').length,
+  }
+
+  const font = "'DM Sans', system-ui, sans-serif"
+
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const warningTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [sessionWarning, setSessionWarning] = useState(false)
@@ -227,21 +241,6 @@ export default function KycAdminPage() {
       if (warningTimer.current) clearTimeout(warningTimer.current)
     }
   }, [resetInactivity])
-
-  return (e.razon_social || '').toLowerCase().includes(search.toLowerCase()) ||
-           (e.rfc || '').toLowerCase().includes(search.toLowerCase()) ||
-           (e.giro || '').toLowerCase().includes(search.toLowerCase())
-  })
-
-  const counts = {
-    all: empresas.length,
-    pending: empresas.filter(e => e.status === 'pending').length,
-    in_review: empresas.filter(e => e.status === 'in_review').length,
-    approved: empresas.filter(e => e.status === 'approved').length,
-    rejected: empresas.filter(e => e.status === 'rejected').length,
-  }
-
-  const font = "'DM Sans', system-ui, sans-serif"
 
   return (
     <>
@@ -740,5 +739,6 @@ function DR({ l, v, mono }: { l: string; v: string; mono?: boolean }) {
       <span style={{ color: '#64748B', fontSize: '0.78rem' }}>{l}</span>
       <span style={{ color: '#1E293B', fontSize: '0.8rem', fontWeight: '500', fontFamily: mono ? 'monospace' : 'inherit', maxWidth: '60%', textAlign: 'right' }}>{v}</span>
     </div>
+  </>
   )
 }
