@@ -1,4 +1,5 @@
 'use client'
+import * as XLSX from 'xlsx'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import React from 'react'
