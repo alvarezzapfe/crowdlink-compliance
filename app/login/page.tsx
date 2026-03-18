@@ -36,6 +36,8 @@ export default function AdminLoginPage() {
     const supabase = createClient()
     const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
     if (authError || !data.user) { setError('Credenciales incorrectas'); setLoading(false); return }
+    const { data: sessionData } = await supabase.auth.getSession()
+    const accessToken = sessionData.session?.access_token || ''
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
     if (profile?.role !== 'admin') {
       await supabase.auth.signOut()
