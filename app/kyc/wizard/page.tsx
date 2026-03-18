@@ -54,11 +54,12 @@ const FUENTE_OPTS = [
 
 export default function KycWizardPage() {
   const [locked, setLocked] = useState(false)
+  const [STEPS, setSTEPS] = useState(STEPS_NO_EKATENA)
   useEffect(() => {
-    setLocked(new URLSearchParams(window.location.search).get('locked') === '1')
+    const l = new URLSearchParams(window.location.search).get('locked') === '1'
+    setLocked(l)
+    setSTEPS(l ? ALL_STEPS : STEPS_NO_EKATENA)
   }, [])
-  const STEPS = locked ? ALL_STEPS : STEPS_NO_EKATENA
-  const totalSteps = STEPS.length
   const [step, setStep] = useState(1)
   const [form, setForm] = useState<Form>({
     razon_social: '', tipo_societario: '', rfc: '', tipo_persona: 'moral', giro: '', pais: 'MX',
@@ -167,7 +168,7 @@ export default function KycWizardPage() {
         const res = await fetch('/api/v1/kyc/empresas/public', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ razon_social: form.razon_social + (form.tipo_societario && form.tipo_societario !== 'Otro' ? ' ' + form.tipo_societario : ''), rfc: form.rfc, giro: form.giro === 'Otro' ? (form.giro_custom || 'Otro') : form.giro, tipo_persona: form.tipo_persona, pais: form.pais, rep_legal_nombre: form.rep_legal_nombre, rep_legal_curp: form.rep_legal_curp, acta_constitutiva_url: docs.acta.url || null, comprobante_domicilio_url: docs.domicilio.url || null, identificacion_rep_url: docs.identificacion.url || null, status: 'pending', metadata: { financiero: { nivel_facturacion: form.nivel_facturacion, num_empleados: form.num_empleados, antiguedad: form.antiguedad, fuente_recursos: form.fuente_recursos, pais_origen_recursos: form.pais_origen_recursos, opera_en_efectivo: form.opera_en_efectivo }, ekatena_conectado: ekatenaStatus === 'connected', ekatena_autenticado: ekatenaStatus === 'connected', ekatena_rfc: form.ekatena_rfc || form.rfc } }),
+          body: JSON.stringify({ razon_social: form.razon_social + (form.tipo_societario && form.tipo_societario !== 'Otro' ? ' ' + form.tipo_societario : ''), rfc: form.rfc, giro: form.giro === 'Otro' ? (form.giro_custom || 'Otro') : form.giro, tipo_persona: form.tipo_persona, giro: form.giro, pais: form.pais, rep_legal_nombre: form.rep_legal_nombre, rep_legal_curp: form.rep_legal_curp, acta_constitutiva_url: docs.acta.url || null, comprobante_domicilio_url: docs.domicilio.url || null, identificacion_rep_url: docs.identificacion.url || null, status: 'pending', metadata: { financiero: { nivel_facturacion: form.nivel_facturacion, num_empleados: form.num_empleados, antiguedad: form.antiguedad, fuente_recursos: form.fuente_recursos, pais_origen_recursos: form.pais_origen_recursos, opera_en_efectivo: form.opera_en_efectivo }, ekatena_conectado: ekatenaStatus === 'connected', ekatena_autenticado: ekatenaStatus === 'connected', ekatena_rfc: form.ekatena_rfc || form.rfc } }),
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Error')
@@ -255,12 +256,12 @@ export default function KycWizardPage() {
 
           {/* Card header */}
           <div style={{ padding: '1rem 1.5rem 0', flexShrink: 0 }}>
-            <div style={{ color: cl.gray400, fontSize: '0.65rem', fontWeight: '700', letterSpacing: '0.08em', marginBottom: '0.1rem' }}>PASO {step} DE 6</div>
+            <div style={{ color: cl.gray400, fontSize: '0.65rem', fontWeight: '700', letterSpacing: '0.08em', marginBottom: '0.1rem' }}>PASO {step} DE {STEPS.length}</div>
             <h2 style={{ color: cl.gray900, fontSize: '1rem', fontWeight: '800', margin: '0 0 0.1rem', letterSpacing: '-0.01em' }}>
               {locked ? ['', 'Datos de la Empresa', 'Representante Legal', 'Perfil Financiero', 'Documentos', 'Conectar Ekatena', 'Confirmar y Enviar'][step] : ['', 'Datos de la Empresa', 'Representante Legal', 'Perfil Financiero', 'Documentos', 'Confirmar y Enviar'][step]}
             </h2>
             <p style={{ color: cl.gray400, fontSize: '0.76rem', margin: '0 0 0.65rem' }}>
-              {['', 'Información fiscal y comercial', 'Persona autorizada para obligar a la empresa', 'Nivel de riesgo y fuente de recursos', 'Sube los documentos del expediente', 'Score crediticio automático (opcional)', 'Revisa antes de enviar'][step]}
+              {locked ? ['', 'Información fiscal y comercial', 'Persona autorizada para obligar a la empresa', 'Nivel de riesgo y fuente de recursos', 'Sube los documentos del expediente', 'Score crediticio automático (opcional)', 'Revisa antes de enviar'][step] : ['', 'Información fiscal y comercial', 'Persona autorizada para obligar a la empresa', 'Nivel de riesgo y fuente de recursos', 'Sube los documentos del expediente', 'Revisa antes de enviar'][step]}
             </p>
             <div style={{ height: '1px', background: cl.gray100 }} />
           </div>
@@ -510,6 +511,16 @@ export default function KycWizardPage() {
             {/* ── STEP 6: Confirmar ── */}
             {((locked && step === 6) || (!locked && step === 5)) && (
               <div>
+                {/* Header visual */}
+                <div style={{ textAlign: 'center', marginBottom: '1.5rem', paddingTop: '0.5rem' }}>
+                  <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'linear-gradient(135deg, #EBF3FF 0%, #F0FDF4 100%)', border: '2px solid #BFDBFE', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0F7BF4" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+                    </svg>
+                  </div>
+                  <div style={{ color: '#111827', fontSize: '1.05rem', fontWeight: '700', marginBottom: '0.3rem' }}>Todo listo para enviar</div>
+                  <div style={{ color: '#6B7280', fontSize: '0.82rem' }}>Revisa que tu información esté correcta antes de enviar</div>
+                </div>
                 <div style={{ border: `1px solid ${cl.gray200}`, borderRadius: '12px', overflow: 'hidden', marginBottom: '1rem' }}>
                   {[
                     { group: 'EMPRESA', rows: [
@@ -530,9 +541,9 @@ export default function KycWizardPage() {
                       { l: 'Comprobante domicilio', v: docs.domicilio.url ? 'Subido' : 'Pendiente' },
                       { l: 'ID Rep. Legal', v: docs.identificacion.url ? 'Subido' : 'Pendiente' },
                     ]},
-                    { group: 'EKATENA', rows: [
+                    ...(locked ? [{ group: 'EKATENA', rows: [
                       { l: 'Estado', v: ekatenaStatus === 'connected' ? 'Conectado' : 'No conectado (se solicitará manualmente)' },
-                    ]},
+                    ]}] : []),
                   ].map(g => (
                     <div key={g.group}>
                       <div style={{ background: cl.gray50, padding: '0.45rem 1rem', borderBottom: `1px solid ${cl.gray100}` }}>
@@ -562,10 +573,10 @@ export default function KycWizardPage() {
               )}
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              {step === 5 && ekatenaStatus !== 'connected' && (
+              {locked && step === 5 && ekatenaStatus !== 'connected' && (
                 <button onClick={() => setStep(6)} style={{ ...btnGhost, color: cl.gray400 }}>Omitir →</button>
               )}
-              {step < 6 && (
+              {step < STEPS.length && (
                 <button onClick={() => {
                   if (step === 1) goNext(() => validateStep1({ razon_social: form.razon_social, rfc: form.rfc, tipo_persona: form.tipo_persona }))
                   else if (step === 2) goNext(() => validateStep2({ rep_legal_nombre: form.rep_legal_nombre, rep_legal_curp: form.rep_legal_curp }))
@@ -575,7 +586,7 @@ export default function KycWizardPage() {
                   Siguiente →
                 </button>
               )}
-              {step === 6 && (
+              {step === STEPS.length && (
                 <button onClick={handleSubmit} disabled={submitting} style={{ ...btnPrimary, background: '#059669', boxShadow: '0 4px 12px rgba(5,150,105,0.25)', opacity: submitting ? 0.6 : 1 }}>
                   {submitting ? 'Enviando...' : 'Enviar solicitud KYC'}
                 </button>
