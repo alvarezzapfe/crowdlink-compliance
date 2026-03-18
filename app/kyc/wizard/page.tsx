@@ -5,13 +5,21 @@ import { cl } from '@/lib/design'
 import { IconCheck, IconZap, IconDoc, IconUser, IconBuilding, IconCreditCard, IconEye, IconEyeOff, IconLock, IconInfo, IconX } from '@/components/Icons'
 import { sanitize, sanitizeRFC, sanitizeCURP, validateStep1, validateStep2, validateStep4 } from '@/lib/validation'
 
-const STEPS = [
+const ALL_STEPS = [
   { n: 1, label: 'Empresa',    icon: <IconBuilding size={15} strokeWidth={1.8} /> },
   { n: 2, label: 'Rep. Legal', icon: <IconUser size={15} strokeWidth={1.8} /> },
   { n: 3, label: 'Financiero', icon: <IconCreditCard size={15} strokeWidth={1.8} /> },
   { n: 4, label: 'Documentos', icon: <IconDoc size={15} strokeWidth={1.8} /> },
   { n: 5, label: 'Ekatena',    icon: <IconZap size={15} strokeWidth={1.8} /> },
   { n: 6, label: 'Confirmar',  icon: <IconCheck size={15} strokeWidth={2} /> },
+]
+// Sin invitación: skip Ekatena (step 5), renumber 6→5
+const STEPS_NO_EKATENA = [
+  { n: 1, label: 'Empresa',    icon: <IconBuilding size={15} strokeWidth={1.8} /> },
+  { n: 2, label: 'Rep. Legal', icon: <IconUser size={15} strokeWidth={1.8} /> },
+  { n: 3, label: 'Financiero', icon: <IconCreditCard size={15} strokeWidth={1.8} /> },
+  { n: 4, label: 'Documentos', icon: <IconDoc size={15} strokeWidth={1.8} /> },
+  { n: 5, label: 'Confirmar',  icon: <IconCheck size={15} strokeWidth={2} /> },
 ]
 
 interface DocFile { file: File | null; url: string; uploading: boolean; error: string }
@@ -49,6 +57,8 @@ export default function KycWizardPage() {
   useEffect(() => {
     setLocked(new URLSearchParams(window.location.search).get('locked') === '1')
   }, [])
+  const STEPS = locked ? ALL_STEPS : STEPS_NO_EKATENA
+  const totalSteps = STEPS.length
   const [step, setStep] = useState(1)
   const [form, setForm] = useState<Form>({
     razon_social: '', tipo_societario: '', rfc: '', tipo_persona: 'moral', giro: '', pais: 'MX',
@@ -157,7 +167,7 @@ export default function KycWizardPage() {
         const res = await fetch('/api/v1/kyc/empresas/public', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ razon_social: form.razon_social + (form.tipo_societario && form.tipo_societario !== 'Otro' ? ' ' + form.tipo_societario : ''), rfc: form.rfc, giro: form.giro === 'Otro' ? (form.giro_custom || 'Otro') : form.giro, tipo_persona: form.tipo_persona, pais: form.pais, rep_legal_nombre: form.rep_legal_nombre, rep_legal_curp: form.rep_legal_curp, acta_constitutiva_url: docs.acta.url || null, comprobante_domicilio_url: docs.domicilio.url || null, identificacion_rep_url: docs.identificacion.url || null, status: 'pending', metadata: { financiero: { nivel_facturacion: form.nivel_facturacion, num_empleados: form.num_empleados, antiguedad: form.antiguedad, fuente_recursos: form.fuente_recursos, pais_origen_recursos: form.pais_origen_recursos, opera_en_efectivo: form.opera_en_efectivo }, ekatena_conectado: ekatenaStatus === 'connected', ekatena_autenticado: ekatenaStatus === 'connected', ekatena_rfc: form.ekatena_rfc || form.rfc } }),
+          body: JSON.stringify({ razon_social: form.razon_social + (form.tipo_societario && form.tipo_societario !== 'Otro' ? ' ' + form.tipo_societario : ''), rfc: form.rfc, giro: form.giro === 'Otro' ? (form.giro_custom || 'Otro') : form.giro, tipo_persona: form.tipo_persona, giro: form.giro, pais: form.pais, rep_legal_nombre: form.rep_legal_nombre, rep_legal_curp: form.rep_legal_curp, acta_constitutiva_url: docs.acta.url || null, comprobante_domicilio_url: docs.domicilio.url || null, identificacion_rep_url: docs.identificacion.url || null, status: 'pending', metadata: { financiero: { nivel_facturacion: form.nivel_facturacion, num_empleados: form.num_empleados, antiguedad: form.antiguedad, fuente_recursos: form.fuente_recursos, pais_origen_recursos: form.pais_origen_recursos, opera_en_efectivo: form.opera_en_efectivo }, ekatena_conectado: ekatenaStatus === 'connected', ekatena_autenticado: ekatenaStatus === 'connected', ekatena_rfc: form.ekatena_rfc || form.rfc } }),
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Error')
@@ -247,7 +257,7 @@ export default function KycWizardPage() {
           <div style={{ padding: '1rem 1.5rem 0', flexShrink: 0 }}>
             <div style={{ color: cl.gray400, fontSize: '0.65rem', fontWeight: '700', letterSpacing: '0.08em', marginBottom: '0.1rem' }}>PASO {step} DE 6</div>
             <h2 style={{ color: cl.gray900, fontSize: '1rem', fontWeight: '800', margin: '0 0 0.1rem', letterSpacing: '-0.01em' }}>
-              {['', 'Datos de la Empresa', 'Representante Legal', 'Perfil Financiero', 'Documentos', 'Conectar Ekatena', 'Confirmar y Enviar'][step]}
+              {locked ? ['', 'Datos de la Empresa', 'Representante Legal', 'Perfil Financiero', 'Documentos', 'Conectar Ekatena', 'Confirmar y Enviar'][step] : ['', 'Datos de la Empresa', 'Representante Legal', 'Perfil Financiero', 'Documentos', 'Confirmar y Enviar'][step]}
             </h2>
             <p style={{ color: cl.gray400, fontSize: '0.76rem', margin: '0 0 0.65rem' }}>
               {['', 'Información fiscal y comercial', 'Persona autorizada para obligar a la empresa', 'Nivel de riesgo y fuente de recursos', 'Sube los documentos del expediente', 'Score crediticio automático (opcional)', 'Revisa antes de enviar'][step]}
@@ -434,8 +444,8 @@ export default function KycWizardPage() {
               </div>
             )}
 
-            {/* ── STEP 5: Ekatena ── */}
-            {step === 5 && (
+            {/* ── STEP 5: Ekatena — solo con invitación ── */}
+            {step === 5 && locked && (
               <div style={{ display: 'grid', gap: '1rem' }}>
                 <div style={{ background: '#F0FDF4', border: '1.5px solid #BBF7D0', borderRadius: '12px', padding: '1rem 1.25rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
                   <IconZap size={18} color="#059669" />
@@ -498,7 +508,7 @@ export default function KycWizardPage() {
             )}
 
             {/* ── STEP 6: Confirmar ── */}
-            {step === 6 && (
+            {((locked && step === 6) || (!locked && step === 5)) && (
               <div>
                 <div style={{ border: `1px solid ${cl.gray200}`, borderRadius: '12px', overflow: 'hidden', marginBottom: '1rem' }}>
                   {[
