@@ -4,7 +4,6 @@ export function sanitize(value: string): string {
   return value
     .replace(/[<>'"`;\\]/g, '')          // XSS básico
     .replace(/(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|CREATE|EXEC|SCRIPT)\b)/gi, '') // SQL/script keywords
-    .trim()
     .slice(0, 500) // límite de longitud
 }
 

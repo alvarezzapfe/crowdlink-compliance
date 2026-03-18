@@ -36,13 +36,12 @@ export default function AdminLoginPage() {
     const supabase = createClient()
     const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
     if (authError || !data.user) { setError('Credenciales incorrectas'); setLoading(false); return }
-    const accessToken = data.session?.access_token
-    if (!accessToken) { await supabase.auth.signOut(); setError('Error de sesion'); setLoading(false); return }
-    const roleRes = await fetch('/api/v1/auth/check-admin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
-    })
-    if (!roleRes.ok) { await supabase.auth.signOut(); setError('Acceso denegado — solo administradores'); setLoading(false); return }
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
+    if (profile?.role !== 'admin') {
+      await supabase.auth.signOut()
+      setError('Acceso denegado — solo administradores'); setLoading(false); return
+    }
+    // Check TOTP status via server endpoint
     const totpCheckRes = await fetch('/api/v1/totp/status', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + accessToken },
@@ -133,7 +132,7 @@ export default function AdminLoginPage() {
                   <label style={lbl}>Email</label>
                   <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleCredentials()}
-                    placeholder="luis@crowdlink.mx" autoFocus style={inp} />
+                    placeholder="correo@ejemplo.com" autoFocus style={inp} />
                 </div>
                 <div>
                   <label style={lbl}>Contraseña</label>
