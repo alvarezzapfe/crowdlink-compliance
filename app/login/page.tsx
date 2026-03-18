@@ -37,7 +37,9 @@ export default function AdminLoginPage() {
     const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
     if (authError || !data.user) { setError('Credenciales incorrectas'); setLoading(false); return }
     const accessToken = data.session?.access_token || ''
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
+    console.log('DEBUG session:', !!data.session, 'token:', !!accessToken, 'user:', data.user?.email)
+    const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
+    console.log('DEBUG profile:', profile, 'profileError:', profileError)
     if (profile?.role !== 'admin') {
       await supabase.auth.signOut()
       setError('Acceso denegado — solo administradores'); setLoading(false); return
