@@ -188,7 +188,7 @@ async function generatePdf(data: any, schedule: any[]) {
   const puppeteer = await import('puppeteer-core')
   const browser = await puppeteer.default.launch({
     args: chromium.default.args,
-    defaultViewport: chromium.default.defaultViewport,
+    defaultViewport: { width: 1200, height: 800 },
     executablePath: await chromium.default.executablePath(),
     headless: true,
   })
