@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-
-// ─── Types ───────────────────────────────────────────────────────────────────
+import { cl } from '@/lib/design'
 
 type AmortizationType = 'bullet' | 'mensual' | 'trimestral' | 'personalizado'
 type Currency = 'MXN' | 'UDIs' | 'USD'
@@ -10,581 +9,237 @@ type RateType = 'fija' | 'variable'
 type PersonType = 'moral' | 'fisica'
 
 interface FormData {
-  // Paso 1 – Acreditado
-  razonSocial: string
-  rfc: string
-  tipoPersona: PersonType
-  representanteLegal: string
-  // Paso 2 – Condiciones
-  monto: string
-  moneda: Currency
-  tipoAmortizacion: AmortizationType
-  plazoMeses: string
-  fechaDisposicion: string
-  // Paso 3 – Pricing
-  tipoTasa: RateType
-  tasaAnual: string
-  referenciaVariable: string
-  spreadPuntos: string
-  underwritingFee: string
-  comisionApertura: string
-  ivaAplicable: boolean
+  razonSocial: string; rfc: string; tipoPersona: PersonType; representanteLegal: string
+  monto: string; moneda: Currency; tipoAmortizacion: AmortizationType
+  plazoMeses: string; fechaDisposicion: string; tipoTasa: RateType
+  tasaAnual: string; referenciaVariable: string; spreadPuntos: string
+  underwritingFee: string; comisionApertura: string; ivaAplicable: boolean
 }
 
-interface PeriodRow {
-  periodo: number
-  fecha: string
-  saldoInicial: number
-  interes: number
-  amortizacion: number
-  comisiones: number
-  total: number
-  saldoFinal: number
+const INITIAL: FormData = {
+  razonSocial: '', rfc: '', tipoPersona: 'moral', representanteLegal: '',
+  monto: '', moneda: 'MXN', tipoAmortizacion: 'mensual',
+  plazoMeses: '', fechaDisposicion: new Date().toISOString().split('T')[0],
+  tipoTasa: 'fija', tasaAnual: '', referenciaVariable: 'TIIE28',
+  spreadPuntos: '', underwritingFee: '', comisionApertura: '', ivaAplicable: true,
 }
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatMXN(n: number) {
-  return n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function addMonths(date: Date, months: number): Date {
-  const d = new Date(date)
-  d.setMonth(d.getMonth() + months)
-  return d
-}
-
-function formatDate(date: Date): string {
-  return date.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
-
-function buildSchedule(data: FormData): PeriodRow[] {
-  const monto = parseFloat(data.monto.replace(/,/g, '')) || 0
-  const plazo = parseInt(data.plazoMeses) || 0
-  const tasaAnual = parseFloat(data.tasaAnual) / 100 || 0
-  const comisionApertura = parseFloat(data.comisionApertura) / 100 || 0
-  const ivaFactor = data.ivaAplicable ? 1.16 : 1
-  const inicio = data.fechaDisposicion ? new Date(data.fechaDisposicion + 'T12:00:00') : new Date()
-
-  if (!monto || !plazo) return []
-
-  const rows: PeriodRow[] = []
-
-  if (data.tipoAmortizacion === 'bullet') {
-    const tasaMensual = tasaAnual / 12
-    const comisionPeriodo = comisionApertura * monto
-    for (let i = 1; i <= plazo; i++) {
-      const interes = monto * tasaMensual * ivaFactor
-      const amort = i === plazo ? monto : 0
-      rows.push({
-        periodo: i,
-        fecha: formatDate(addMonths(inicio, i)),
-        saldoInicial: monto,
-        interes,
-        amortizacion: amort,
-        comisiones: i === 1 ? comisionPeriodo : 0,
-        total: interes + amort + (i === 1 ? comisionPeriodo : 0),
-        saldoFinal: i === plazo ? 0 : monto,
-      })
-    }
-  } else if (data.tipoAmortizacion === 'mensual') {
-    const tasaMensual = tasaAnual / 12
-    const pago = monto * tasaMensual / (1 - Math.pow(1 + tasaMensual, -plazo))
-    let saldo = monto
-    for (let i = 1; i <= plazo; i++) {
-      const interes = saldo * tasaMensual * ivaFactor
-      const amort = pago - saldo * tasaMensual
-      const saldoFinal = Math.max(0, saldo - amort)
-      rows.push({
-        periodo: i,
-        fecha: formatDate(addMonths(inicio, i)),
-        saldoInicial: saldo,
-        interes,
-        amortizacion: amort,
-        comisiones: i === 1 ? comisionApertura * monto : 0,
-        total: pago * ivaFactor + (i === 1 ? comisionApertura * monto : 0),
-        saldoFinal,
-      })
-      saldo = saldoFinal
-    }
-  } else if (data.tipoAmortizacion === 'trimestral') {
-    const periodosTotal = Math.ceil(plazo / 3)
-    const tasaTrimestral = tasaAnual / 4
-    const pago = monto * tasaTrimestral / (1 - Math.pow(1 + tasaTrimestral, -periodosTotal))
-    let saldo = monto
-    for (let i = 1; i <= periodosTotal; i++) {
-      const interes = saldo * tasaTrimestral * ivaFactor
-      const amort = pago - saldo * tasaTrimestral
-      const saldoFinal = Math.max(0, saldo - amort)
-      rows.push({
-        periodo: i,
-        fecha: formatDate(addMonths(inicio, i * 3)),
-        saldoInicial: saldo,
-        interes,
-        amortizacion: amort,
-        comisiones: i === 1 ? comisionApertura * monto : 0,
-        total: pago * ivaFactor + (i === 1 ? comisionApertura * monto : 0),
-        saldoFinal,
-      })
-      saldo = saldoFinal
-    }
-  }
-
-  return rows
-}
-
-// ─── Step Components ─────────────────────────────────────────────────────────
-
-function StepAcreditado({ data, onChange }: { data: FormData; onChange: (k: keyof FormData, v: string) => void }) {
-  return (
-    <div className="space-y-5">
-      <div>
-        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Razón Social / Nombre</label>
-        <input
-          value={data.razonSocial}
-          onChange={e => onChange('razonSocial', e.target.value)}
-          placeholder="Empresa S.A. de C.V."
-          className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">RFC</label>
-          <input
-            value={data.rfc}
-            onChange={e => onChange('rfc', e.target.value.toUpperCase())}
-            placeholder="AAA000101AAA"
-            className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Tipo de Persona</label>
-          <select
-            value={data.tipoPersona}
-            onChange={e => onChange('tipoPersona', e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-          >
-            <option value="moral">Persona Moral</option>
-            <option value="fisica">Persona Física</option>
-          </select>
-        </div>
-      </div>
-      <div>
-        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Representante Legal</label>
-        <input
-          value={data.representanteLegal}
-          onChange={e => onChange('representanteLegal', e.target.value)}
-          placeholder="Nombre completo del representante"
-          className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-    </div>
-  )
-}
-
-function StepCondiciones({ data, onChange }: { data: FormData; onChange: (k: keyof FormData, v: string) => void }) {
-  return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Monto del Crédito</label>
-          <input
-            value={data.monto}
-            onChange={e => onChange('monto', e.target.value)}
-            placeholder="1,000,000"
-            className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Moneda</label>
-          <select
-            value={data.moneda}
-            onChange={e => onChange('moneda', e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-          >
-            <option value="MXN">MXN – Pesos Mexicanos</option>
-            <option value="UDIs">UDIs</option>
-            <option value="USD">USD – Dólares</option>
-          </select>
-        </div>
-      </div>
-      <div>
-        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Tipo de Amortización</label>
-        <div className="grid grid-cols-2 gap-3">
-          {([
-            ['bullet', 'Bullet', 'Pago único al vencimiento'],
-            ['mensual', 'Mensual', 'Pagos fijos cada mes'],
-            ['trimestral', 'Trimestral', 'Pagos fijos cada trimestre'],
-            ['personalizado', 'Personalizado', 'Flujo a definir'],
-          ] as [AmortizationType, string, string][]).map(([val, label, desc]) => (
-            <button
-              key={val}
-              onClick={() => onChange('tipoAmortizacion', val)}
-              className={`p-3 rounded-lg border-2 text-left transition-all ${
-                data.tipoAmortizacion === val
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <div className="font-semibold text-sm text-gray-800">{label}</div>
-              <div className="text-xs text-gray-500 mt-0.5">{desc}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Plazo (meses)</label>
-          <input
-            value={data.plazoMeses}
-            onChange={e => onChange('plazoMeses', e.target.value)}
-            placeholder="24"
-            type="number"
-            className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Fecha de Disposición</label>
-          <input
-            value={data.fechaDisposicion}
-            onChange={e => onChange('fechaDisposicion', e.target.value)}
-            type="date"
-            className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function StepPricing({ data, onChange, onToggleIva }: {
-  data: FormData
-  onChange: (k: keyof FormData, v: string) => void
-  onToggleIva: () => void
-}) {
-  return (
-    <div className="space-y-5">
-      <div>
-        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Tipo de Tasa</label>
-        <div className="flex gap-3">
-          {(['fija', 'variable'] as RateType[]).map(t => (
-            <button
-              key={t}
-              onClick={() => onChange('tipoTasa', t)}
-              className={`flex-1 py-2.5 rounded-lg border-2 text-sm font-semibold capitalize transition-all ${
-                data.tipoTasa === t ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600'
-              }`}
-            >
-              {t === 'fija' ? 'Tasa Fija' : 'Tasa Variable'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {data.tipoTasa === 'fija' ? (
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Tasa Anual (%)</label>
-          <input
-            value={data.tasaAnual}
-            onChange={e => onChange('tasaAnual', e.target.value)}
-            placeholder="18.00"
-            type="number"
-            step="0.25"
-            className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-          />
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Referencia</label>
-            <select
-              value={data.referenciaVariable}
-              onChange={e => onChange('referenciaVariable', e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              <option value="TIIE28">TIIE 28 días</option>
-              <option value="TIIE91">TIIE 91 días</option>
-              <option value="SOFR">SOFR</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Spread (puntos base)</label>
-            <input
-              value={data.spreadPuntos}
-              onChange={e => onChange('spreadPuntos', e.target.value)}
-              placeholder="500"
-              type="number"
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-            />
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Underwriting Fee (%)</label>
-          <input
-            value={data.underwritingFee}
-            onChange={e => onChange('underwritingFee', e.target.value)}
-            placeholder="2.00"
-            type="number"
-            step="0.25"
-            className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Comisión de Apertura (%)</label>
-          <input
-            value={data.comisionApertura}
-            onChange={e => onChange('comisionApertura', e.target.value)}
-            placeholder="1.00"
-            type="number"
-            step="0.25"
-            className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-          />
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-        <div>
-          <div className="text-sm font-semibold text-gray-700">IVA sobre intereses</div>
-          <div className="text-xs text-gray-500 mt-0.5">Aplica 16% IVA sobre intereses y comisiones</div>
-        </div>
-        <button
-          onClick={onToggleIva}
-          className={`relative w-11 h-6 rounded-full transition-colors ${data.ivaAplicable ? 'bg-blue-500' : 'bg-gray-300'}`}
-        >
-          <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${data.ivaAplicable ? 'translate-x-5' : ''}`} />
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function StepReview({ data, schedule }: { data: FormData; schedule: PeriodRow[] }) {
-  const monto = parseFloat(data.monto.replace(/,/g, '')) || 0
-  const uwFee = parseFloat(data.underwritingFee) / 100 || 0
-  const totalIntereses = schedule.reduce((s, r) => s + r.interes, 0)
-  const totalComisiones = schedule.reduce((s, r) => s + r.comisiones, 0) + uwFee * monto
-  const tasaLabel = data.tipoTasa === 'fija'
-    ? `${data.tasaAnual}% anual fija`
-    : `${data.referenciaVariable} + ${data.spreadPuntos} pb`
-
-  return (
-    <div className="space-y-6">
-      {/* Resumen ejecutivo */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          ['Monto', `${data.moneda} $${formatMXN(monto)}`],
-          ['Plazo', `${data.plazoMeses} meses`],
-          ['Tasa', tasaLabel],
-          ['Amortización', data.tipoAmortizacion],
-          ['Total Intereses', `$${formatMXN(totalIntereses)}`],
-          ['Total Comisiones', `$${formatMXN(totalComisiones)}`],
-        ].map(([label, value]) => (
-          <div key={label} className="bg-gray-50 rounded-lg p-3">
-            <div className="text-xs text-gray-500 uppercase tracking-wider">{label}</div>
-            <div className="text-sm font-semibold text-gray-800 mt-0.5 capitalize">{value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Tabla de amortización */}
-      {schedule.length > 0 && (
-        <div>
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Tabla de Amortización</div>
-          <div className="overflow-x-auto rounded-lg border border-gray-200">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  {['#', 'Fecha', 'Saldo Inicial', 'Interés', 'Amortización', 'Comisiones', 'Total', 'Saldo Final'].map(h => (
-                    <th key={h} className="px-3 py-2 text-left font-semibold text-gray-600">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {schedule.map((row, i) => (
-                  <tr key={i} className={`border-b border-gray-100 ${i % 2 === 0 ? '' : 'bg-gray-50/50'}`}>
-                    <td className="px-3 py-2 text-gray-500">{row.periodo}</td>
-                    <td className="px-3 py-2 text-gray-600 font-mono">{row.fecha}</td>
-                    <td className="px-3 py-2 text-gray-700 font-mono">{formatMXN(row.saldoInicial)}</td>
-                    <td className="px-3 py-2 text-gray-700 font-mono">{formatMXN(row.interes)}</td>
-                    <td className="px-3 py-2 text-gray-700 font-mono">{formatMXN(row.amortizacion)}</td>
-                    <td className="px-3 py-2 text-orange-600 font-mono">{row.comisiones > 0 ? formatMXN(row.comisiones) : '—'}</td>
-                    <td className="px-3 py-2 font-semibold text-gray-800 font-mono">{formatMXN(row.total)}</td>
-                    <td className="px-3 py-2 text-gray-700 font-mono">{formatMXN(row.saldoFinal)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="bg-blue-50 font-semibold border-t-2 border-blue-200">
-                  <td colSpan={4} className="px-3 py-2 text-xs text-blue-700">TOTALES</td>
-                  <td className="px-3 py-2 text-xs font-mono text-blue-700">{formatMXN(schedule.reduce((s, r) => s + r.amortizacion, 0))}</td>
-                  <td className="px-3 py-2 text-xs font-mono text-blue-700">{formatMXN(schedule.reduce((s, r) => s + r.comisiones, 0))}</td>
-                  <td className="px-3 py-2 text-xs font-mono text-blue-700">{formatMXN(schedule.reduce((s, r) => s + r.total, 0))}</td>
-                  <td className="px-3 py-2 text-xs font-mono text-blue-700">—</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Main Component ───────────────────────────────────────────────────────────
 
 const STEPS = [
   { label: 'Acreditado', desc: 'Datos del solicitante' },
-  { label: 'Condiciones', desc: 'Monto, plazo y tipo' },
-  { label: 'Pricing', desc: 'Tasas y comisiones' },
-  { label: 'Resumen', desc: 'Revisión y descarga' },
+  { label: 'Condiciones', desc: 'Monto, plazo y tipo de amortización' },
+  { label: 'Pricing', desc: 'Tasas, comisiones y fees' },
+  { label: 'Resumen', desc: 'Revisa y descarga el term sheet' },
 ]
 
-const INITIAL: FormData = {
-  razonSocial: '',
-  rfc: '',
-  tipoPersona: 'moral',
-  representanteLegal: '',
-  monto: '',
-  moneda: 'MXN',
-  tipoAmortizacion: 'mensual',
-  plazoMeses: '',
-  fechaDisposicion: new Date().toISOString().split('T')[0],
-  tipoTasa: 'fija',
-  tasaAnual: '',
-  referenciaVariable: 'TIIE28',
-  spreadPuntos: '',
-  underwritingFee: '',
-  comisionApertura: '',
-  ivaAplicable: true,
+const ACCENT = '#7C3AED'
+const ACCENT_LIGHT = '#F5F3FF'
+
+function fmt(n: number) {
+  return n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function addMonths(d: Date, m: number) { const r = new Date(d); r.setMonth(r.getMonth() + m); return r }
+function fmtDate(d: Date) { return d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) }
+
+function buildSchedule(data: FormData) {
+  const monto = parseFloat(data.monto) || 0
+  const plazo = parseInt(data.plazoMeses) || 0
+  const tasaAnual = data.tipoTasa === 'fija' ? (parseFloat(data.tasaAnual) / 100 || 0) : (parseFloat(data.spreadPuntos) || 0) / 10000
+  const comAp = (parseFloat(data.comisionApertura) / 100) || 0
+  const iva = data.ivaAplicable ? 1.16 : 1
+  const inicio = data.fechaDisposicion ? new Date(data.fechaDisposicion + 'T12:00:00') : new Date()
+  if (!monto || !plazo) return []
+  const rows: { periodo: number; fecha: string; saldoInicial: number; interes: number; amortizacion: number; comisiones: number; total: number; saldoFinal: number }[] = []
+  if (data.tipoAmortizacion === 'bullet') {
+    const tm = tasaAnual / 12
+    for (let i = 1; i <= plazo; i++) {
+      const interes = monto * tm * iva; const amort = i === plazo ? monto : 0; const comis = i === 1 ? comAp * monto : 0
+      rows.push({ periodo: i, fecha: fmtDate(addMonths(inicio, i)), saldoInicial: monto, interes, amortizacion: amort, comisiones: comis, total: interes + amort + comis, saldoFinal: i === plazo ? 0 : monto })
+    }
+  } else if (data.tipoAmortizacion === 'mensual') {
+    const tm = tasaAnual / 12; const pago = tm ? monto * tm / (1 - Math.pow(1 + tm, -plazo)) : monto / plazo; let saldo = monto
+    for (let i = 1; i <= plazo; i++) {
+      const interes = saldo * tm * iva; const amort = pago - saldo * tm; const sf = Math.max(0, saldo - amort); const comis = i === 1 ? comAp * monto : 0
+      rows.push({ periodo: i, fecha: fmtDate(addMonths(inicio, i)), saldoInicial: saldo, interes, amortizacion: amort, comisiones: comis, total: pago * iva + comis, saldoFinal: sf }); saldo = sf
+    }
+  } else if (data.tipoAmortizacion === 'trimestral') {
+    const periodos = Math.ceil(plazo / 3); const tt = tasaAnual / 4; const pago = tt ? monto * tt / (1 - Math.pow(1 + tt, -periodos)) : monto / periodos; let saldo = monto
+    for (let i = 1; i <= periodos; i++) {
+      const interes = saldo * tt * iva; const amort = pago - saldo * tt; const sf = Math.max(0, saldo - amort); const comis = i === 1 ? comAp * monto : 0
+      rows.push({ periodo: i, fecha: fmtDate(addMonths(inicio, i * 3)), saldoInicial: saldo, interes, amortizacion: amort, comisiones: comis, total: pago * iva + comis, saldoFinal: sf }); saldo = sf
+    }
+  }
+  return rows
 }
 
-export default function TermSheetGenerator() {
+const inputStyle: React.CSSProperties = { width: '100%', border: '1px solid #E5E7EB', borderRadius: '10px', padding: '10px 14px', fontSize: '0.875rem', color: '#111827', background: '#FFFFFF', outline: 'none', boxSizing: 'border-box' }
+const labelStyle: React.CSSProperties = { display: 'block', fontSize: '0.72rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div style={{ marginBottom: '16px' }}><label style={labelStyle}>{label}</label>{children}</div>
+}
+
+function StepAcreditado({ data, onChange }: { data: FormData; onChange: (k: keyof FormData, v: string) => void }) {
+  return (<>
+    <Field label="Razón Social / Nombre"><input style={inputStyle} value={data.razonSocial} placeholder="Empresa S.A. de C.V." onChange={e => onChange('razonSocial', e.target.value)} /></Field>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+      <Field label="RFC"><input style={{ ...inputStyle, fontFamily: 'monospace', textTransform: 'uppercase' }} value={data.rfc} placeholder="AAA000101AAA" onChange={e => onChange('rfc', e.target.value.toUpperCase())} /></Field>
+      <Field label="Tipo de Persona"><select style={inputStyle} value={data.tipoPersona} onChange={e => onChange('tipoPersona', e.target.value)}><option value="moral">Persona Moral</option><option value="fisica">Persona Física</option></select></Field>
+    </div>
+    <Field label="Representante Legal"><input style={inputStyle} value={data.representanteLegal} placeholder="Nombre completo" onChange={e => onChange('representanteLegal', e.target.value)} /></Field>
+  </>)
+}
+
+function StepCondiciones({ data, onChange }: { data: FormData; onChange: (k: keyof FormData, v: string) => void }) {
+  const opts: { val: AmortizationType; label: string; desc: string }[] = [{ val: 'bullet', label: 'Bullet', desc: 'Pago único al vencimiento' }, { val: 'mensual', label: 'Mensual', desc: 'Pagos fijos cada mes' }, { val: 'trimestral', label: 'Trimestral', desc: 'Pagos fijos cada trimestre' }, { val: 'personalizado', label: 'Personalizado', desc: 'Flujo a definir' }]
+  return (<>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+      <Field label="Monto del Crédito"><input style={{ ...inputStyle, fontFamily: 'monospace' }} value={data.monto} type="number" placeholder="1000000" onChange={e => onChange('monto', e.target.value)} /></Field>
+      <Field label="Moneda"><select style={inputStyle} value={data.moneda} onChange={e => onChange('moneda', e.target.value)}><option value="MXN">MXN – Pesos Mexicanos</option><option value="UDIs">UDIs</option><option value="USD">USD – Dólares</option></select></Field>
+    </div>
+    <Field label="Tipo de Amortización">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+        {opts.map(o => (<button key={o.val} onClick={() => onChange('tipoAmortizacion', o.val)} style={{ border: `1.5px solid ${data.tipoAmortizacion === o.val ? ACCENT : '#E5E7EB'}`, borderRadius: '10px', padding: '12px 14px', background: data.tipoAmortizacion === o.val ? ACCENT_LIGHT : '#FFFFFF', cursor: 'pointer', textAlign: 'left' }}>
+          <div style={{ fontSize: '0.875rem', fontWeight: 600, color: data.tipoAmortizacion === o.val ? ACCENT : '#111827' }}>{o.label}</div>
+          <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: '2px' }}>{o.desc}</div>
+        </button>))}
+      </div>
+    </Field>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+      <Field label="Plazo (meses)"><input style={{ ...inputStyle, fontFamily: 'monospace' }} value={data.plazoMeses} type="number" placeholder="24" onChange={e => onChange('plazoMeses', e.target.value)} /></Field>
+      <Field label="Fecha de Disposición"><input style={inputStyle} value={data.fechaDisposicion} type="date" onChange={e => onChange('fechaDisposicion', e.target.value)} /></Field>
+    </div>
+  </>)
+}
+
+function StepPricing({ data, onChange }: { data: FormData; onChange: (k: keyof FormData, v: string | boolean) => void }) {
+  return (<>
+    <Field label="Tipo de Tasa">
+      <div style={{ display: 'flex', gap: '10px' }}>
+        {(['fija', 'variable'] as RateType[]).map(t => (<button key={t} onClick={() => onChange('tipoTasa', t)} style={{ flex: 1, border: `1.5px solid ${data.tipoTasa === t ? ACCENT : '#E5E7EB'}`, borderRadius: '10px', padding: '10px', background: data.tipoTasa === t ? ACCENT_LIGHT : '#FFFFFF', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600, color: data.tipoTasa === t ? ACCENT : '#4B5563' }}>{t === 'fija' ? 'Tasa Fija' : 'Tasa Variable'}</button>))}
+      </div>
+    </Field>
+    {data.tipoTasa === 'fija'
+      ? <Field label="Tasa Anual (%)"><input style={{ ...inputStyle, fontFamily: 'monospace' }} value={data.tasaAnual} type="number" step="0.25" placeholder="18.00" onChange={e => onChange('tasaAnual', e.target.value)} /></Field>
+      : <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+          <Field label="Referencia"><select style={inputStyle} value={data.referenciaVariable} onChange={e => onChange('referenciaVariable', e.target.value)}><option value="TIIE28">TIIE 28 días</option><option value="TIIE91">TIIE 91 días</option><option value="SOFR">SOFR</option></select></Field>
+          <Field label="Spread (puntos base)"><input style={{ ...inputStyle, fontFamily: 'monospace' }} value={data.spreadPuntos} type="number" placeholder="500" onChange={e => onChange('spreadPuntos', e.target.value)} /></Field>
+        </div>}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+      <Field label="Underwriting Fee (%)"><input style={{ ...inputStyle, fontFamily: 'monospace' }} value={data.underwritingFee} type="number" step="0.25" placeholder="2.00" onChange={e => onChange('underwritingFee', e.target.value)} /></Field>
+      <Field label="Comisión de Apertura (%)"><input style={{ ...inputStyle, fontFamily: 'monospace' }} value={data.comisionApertura} type="number" step="0.25" placeholder="1.00" onChange={e => onChange('comisionApertura', e.target.value)} /></Field>
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F9FAFB', borderRadius: '10px', padding: '14px 16px', border: '1px solid #E5E7EB' }}>
+      <div><div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#111827' }}>IVA sobre intereses</div><div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: '2px' }}>Aplica 16% IVA sobre intereses y comisiones</div></div>
+      <button onClick={() => onChange('ivaAplicable', !data.ivaAplicable)} style={{ width: '44px', height: '24px', borderRadius: '12px', border: 'none', cursor: 'pointer', position: 'relative', background: data.ivaAplicable ? ACCENT : '#D1D5DB', transition: 'background 0.2s', flexShrink: 0 }}>
+        <span style={{ position: 'absolute', top: '3px', left: data.ivaAplicable ? '23px' : '3px', width: '18px', height: '18px', borderRadius: '50%', background: '#FFFFFF', transition: 'left 0.2s' }} />
+      </button>
+    </div>
+  </>)
+}
+
+function StepResumen({ data, schedule }: { data: FormData; schedule: ReturnType<typeof buildSchedule> }) {
+  const monto = parseFloat(data.monto) || 0
+  const uw = (parseFloat(data.underwritingFee) / 100) || 0
+  const totalInt = schedule.reduce((s, r) => s + r.interes, 0)
+  const totalAmort = schedule.reduce((s, r) => s + r.amortizacion, 0)
+  const totalComis = schedule.reduce((s, r) => s + r.comisiones, 0)
+  const totalPago = schedule.reduce((s, r) => s + r.total, 0)
+  const tasaLabel = data.tipoTasa === 'fija' ? `${data.tasaAnual}% anual fija` : `${data.referenciaVariable} + ${data.spreadPuntos} pb`
+  const metrics = [['Monto', `${data.moneda} $${fmt(monto)}`], ['Plazo', `${data.plazoMeses} meses`], ['Tasa', tasaLabel], ['Amortización', data.tipoAmortizacion], ['Total intereses', `$${fmt(totalInt)}`], ['Total comisiones', `$${fmt(totalComis + uw * monto)}`]]
+  return (<>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '24px' }}>
+      {metrics.map(([l, v]) => (<div key={l} style={{ background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '10px', padding: '12px 14px' }}>
+        <div style={{ fontSize: '0.7rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>{l}</div>
+        <div style={{ fontSize: '0.875rem', fontWeight: 700, color: '#111827', marginTop: '4px', textTransform: 'capitalize' }}>{v}</div>
+      </div>))}
+    </div>
+    {schedule.length > 0 && (<>
+      <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>Tabla de amortización</div>
+      <div style={{ overflowX: 'auto', border: '1px solid #E5E7EB', borderRadius: '10px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', minWidth: '620px' }}>
+          <thead><tr style={{ background: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
+            {['#', 'Fecha', 'Saldo Ini.', 'Interés', 'Amort.', 'Comis.', 'Total', 'Saldo Fin.'].map(h => (<th key={h} style={{ padding: '8px 10px', textAlign: h === '#' || h === 'Fecha' ? 'left' : 'right', color: '#6B7280', fontWeight: 600 }}>{h}</th>))}
+          </tr></thead>
+          <tbody>
+            {schedule.map((r, i) => (<tr key={i} style={{ borderBottom: '1px solid #F3F4F6', background: i % 2 ? '#F9FAFB' : '#FFFFFF' }}>
+              <td style={{ padding: '6px 10px', color: '#9CA3AF' }}>{r.periodo}</td>
+              <td style={{ padding: '6px 10px', color: '#4B5563', fontFamily: 'monospace' }}>{r.fecha}</td>
+              <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace', color: '#374151' }}>{fmt(r.saldoInicial)}</td>
+              <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace', color: '#374151' }}>{fmt(r.interes)}</td>
+              <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace', color: '#374151' }}>{fmt(r.amortizacion)}</td>
+              <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace', color: r.comisiones > 0 ? '#B45309' : '#9CA3AF' }}>{r.comisiones > 0 ? fmt(r.comisiones) : '—'}</td>
+              <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: '#111827' }}>{fmt(r.total)}</td>
+              <td style={{ padding: '6px 10px', textAlign: 'right', fontFamily: 'monospace', color: '#4B5563' }}>{fmt(r.saldoFinal)}</td>
+            </tr>))}
+          </tbody>
+          <tfoot><tr style={{ background: ACCENT_LIGHT, borderTop: `2px solid ${ACCENT}` }}>
+            <td colSpan={4} style={{ padding: '8px 10px', fontSize: '0.75rem', fontWeight: 700, color: ACCENT }}>TOTALES</td>
+            <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.78rem', fontWeight: 700, color: ACCENT }}>{fmt(totalAmort)}</td>
+            <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.78rem', fontWeight: 700, color: ACCENT }}>{fmt(totalComis)}</td>
+            <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.78rem', fontWeight: 700, color: ACCENT }}>{fmt(totalPago)}</td>
+            <td style={{ padding: '8px 10px', textAlign: 'right', color: ACCENT }}>—</td>
+          </tr></tfoot>
+        </table>
+      </div>
+    </>)}
+  </>)
+}
+
+export default function TermSheetPage() {
   const [step, setStep] = useState(0)
   const [data, setData] = useState<FormData>(INITIAL)
   const [generating, setGenerating] = useState(false)
-
-  const onChange = useCallback((k: keyof FormData, v: string) => {
-    setData(prev => ({ ...prev, [k]: v }))
-  }, [])
-
-  const onToggleIva = useCallback(() => {
-    setData(prev => ({ ...prev, ivaAplicable: !prev.ivaAplicable }))
-  }, [])
-
+  const onChange = useCallback((k: keyof FormData, v: string | boolean) => { setData(prev => ({ ...prev, [k]: v })) }, [])
   const schedule = buildSchedule(data)
-
-  const handleGeneratePDF = async () => {
-    setGenerating(true)
-    // PDF generation would be handled server-side via API route
-    // e.g. POST /api/term-sheet/generate with data + schedule
-    await new Promise(r => setTimeout(r, 1500))
-    setGenerating(false)
-    alert('PDF generado. Integra /api/term-sheet/generate con ReportLab o Puppeteer.')
-  }
+  const handleGenerate = async () => { setGenerating(true); await new Promise(r => setTimeout(r, 1200)); setGenerating(false); alert('Próximamente: integración PDF vía /api/term-sheet/generate') }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-blue-600 font-bold text-xl tracking-tight">crowdlink</span>
-            <span className="text-gray-300 text-lg">|</span>
-            <span className="text-gray-500 text-sm">Compliance Hub</span>
+    <div style={{ minHeight: '100vh', background: '#F9FAFB', fontFamily: cl.fontFamily }}>
+      <div style={{ background: '#FFFFFF', borderBottom: '1px solid #E5E7EB', padding: '0 2rem', height: '60px', display: 'flex', alignItems: 'center' }}>
+        <a href="/gate" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <img src="/crowdlink-logo.png" alt="Crowdlink" style={{ height: '22px', width: 'auto' }} />
+          <div style={{ width: '1px', height: '18px', background: '#E5E7EB' }} />
+          <span style={{ color: '#9CA3AF', fontSize: '0.82rem', fontWeight: 500 }}>Compliance Hub</span>
+        </a>
+      </div>
+      <div style={{ background: '#FFFFFF', borderBottom: '1px solid #E5E7EB', padding: '2.5rem 2rem 2rem' }}>
+        <div style={{ maxWidth: '760px', margin: '0 auto' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: ACCENT }} />
+            <span style={{ color: ACCENT, fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.06em' }}>TERM SHEET GENERATOR</span>
           </div>
+          <h1 style={{ color: '#111827', fontSize: '1.75rem', fontWeight: 800, margin: '0 0 0.4rem', letterSpacing: '-0.02em' }}>Nueva propuesta de crédito</h1>
+          <p style={{ color: '#6B7280', fontSize: '0.9rem', margin: 0 }}>Completa los datos para generar el term sheet en PDF.</p>
         </div>
       </div>
-
-      <div className="max-w-3xl mx-auto px-6 py-10">
-        {/* Page title */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-2 h-2 bg-green-500 rounded-full" />
-            <span className="text-xs font-semibold text-green-600 uppercase tracking-widest">Term Sheet Generator</span>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">Nueva Propuesta de Crédito</h1>
-          <p className="text-gray-500 mt-1">Completa los datos para generar el term sheet en PDF.</p>
-        </div>
-
-        {/* Step indicator */}
-        <div className="flex items-center gap-0 mb-8">
-          {STEPS.map((s, i) => (
-            <div key={i} className="flex items-center flex-1">
-              <button
-                onClick={() => i < step && setStep(i)}
-                className="flex flex-col items-center flex-shrink-0"
-              >
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
-                  i < step ? 'bg-green-500 text-white' :
-                  i === step ? 'bg-blue-600 text-white ring-4 ring-blue-100' :
-                  'bg-gray-200 text-gray-500'
-                }`}>
-                  {i < step ? '✓' : i + 1}
-                </div>
-                <div className={`text-xs font-semibold mt-1 ${i === step ? 'text-blue-600' : 'text-gray-400'}`}>
-                  {s.label}
-                </div>
-              </button>
-              {i < STEPS.length - 1 && (
-                <div className={`flex-1 h-0.5 mx-2 transition-all ${i < step ? 'bg-green-400' : 'bg-gray-200'}`} />
-              )}
+      <div style={{ maxWidth: '760px', margin: '0 auto', padding: '2.5rem 2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '28px' }}>
+          {STEPS.map((s, i) => (<div key={i} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+              <div onClick={() => i < step && setStep(i)} style={{ width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700, cursor: i < step ? 'pointer' : 'default', background: i < step ? '#059669' : i === step ? ACCENT : '#E5E7EB', color: i <= step ? '#FFFFFF' : '#9CA3AF', boxShadow: i === step ? `0 0 0 4px ${ACCENT_LIGHT}` : 'none' }}>
+                {i < step ? '✓' : i + 1}
+              </div>
+              <div style={{ fontSize: '0.68rem', fontWeight: 600, marginTop: '5px', color: i === step ? ACCENT : '#9CA3AF', whiteSpace: 'nowrap' }}>{s.label}</div>
             </div>
-          ))}
+            {i < STEPS.length - 1 && <div style={{ flex: 1, height: '1px', margin: '0 8px', marginBottom: '18px', background: i < step ? '#059669' : '#E5E7EB' }} />}
+          </div>))}
         </div>
-
-        {/* Card */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
-          <div className="mb-6">
-            <h2 className="text-lg font-bold text-gray-900">{STEPS[step].label}</h2>
-            <p className="text-sm text-gray-500">{STEPS[step].desc}</p>
+        <div style={{ background: '#FFFFFF', border: '1.5px solid #E5E7EB', borderRadius: '16px', padding: '2rem', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+          <div style={{ marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid #F3F4F6' }}>
+            <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#111827' }}>{STEPS[step].label}</div>
+            <div style={{ fontSize: '0.82rem', color: '#6B7280', marginTop: '2px' }}>{STEPS[step].desc}</div>
           </div>
-
-          {step === 0 && <StepAcreditado data={data} onChange={onChange} />}
-          {step === 1 && <StepCondiciones data={data} onChange={onChange} />}
-          {step === 2 && <StepPricing data={data} onChange={onChange} onToggleIva={onToggleIva} />}
-          {step === 3 && <StepReview data={data} schedule={schedule} />}
-
-          {/* Actions */}
-          <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
-            <button
-              onClick={() => setStep(s => Math.max(0, s - 1))}
-              disabled={step === 0}
-              className="px-5 py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
-            >
-              ← Anterior
-            </button>
-
-            {step < STEPS.length - 1 ? (
-              <button
-                onClick={() => setStep(s => s + 1)}
-                className="px-6 py-2.5 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-              >
-                Siguiente →
-              </button>
-            ) : (
-              <button
-                onClick={handleGeneratePDF}
-                disabled={generating}
-                className="px-6 py-2.5 text-sm font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2 disabled:opacity-70"
-              >
-                {generating ? (
-                  <>
-                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                    </svg>
-                    Generando PDF...
-                  </>
-                ) : (
-                  '↓ Descargar Term Sheet PDF'
-                )}
-              </button>
-            )}
+          {step === 0 && <StepAcreditado data={data} onChange={onChange as (k: keyof FormData, v: string) => void} />}
+          {step === 1 && <StepCondiciones data={data} onChange={onChange as (k: keyof FormData, v: string) => void} />}
+          {step === 2 && <StepPricing data={data} onChange={onChange} />}
+          {step === 3 && <StepResumen data={data} schedule={schedule} />}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #F3F4F6' }}>
+            <button onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0} style={{ padding: '10px 20px', fontSize: '0.875rem', fontWeight: 600, border: '1px solid #E5E7EB', borderRadius: '10px', background: '#FFFFFF', color: '#4B5563', cursor: step === 0 ? 'not-allowed' : 'pointer', opacity: step === 0 ? 0.4 : 1 }}>← Anterior</button>
+            {step < STEPS.length - 1
+              ? <button onClick={() => setStep(s => s + 1)} style={{ padding: '10px 24px', fontSize: '0.875rem', fontWeight: 700, border: 'none', borderRadius: '10px', background: ACCENT, color: '#FFFFFF', cursor: 'pointer' }}>Siguiente →</button>
+              : <button onClick={handleGenerate} disabled={generating} style={{ padding: '10px 24px', fontSize: '0.875rem', fontWeight: 700, border: 'none', borderRadius: '10px', background: '#059669', color: '#FFFFFF', cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.7 : 1 }}>{generating ? 'Generando...' : '↓ Descargar Term Sheet PDF'}</button>}
           </div>
         </div>
+        <p style={{ color: '#D1D5DB', fontSize: '0.75rem', textAlign: 'center', marginTop: '2rem' }}>PorCuanto S.A. de C.V.</p>
       </div>
     </div>
   )
