@@ -190,7 +190,28 @@ export default function TermSheetPage() {
   const [generating, setGenerating] = useState(false)
   const onChange = useCallback((k: keyof FormData, v: string | boolean) => { setData(prev => ({ ...prev, [k]: v })) }, [])
   const schedule = buildSchedule(data)
-  const handleGenerate = async () => { setGenerating(true); await new Promise(r => setTimeout(r, 1200)); setGenerating(false); alert('Próximamente: integración PDF vía /api/term-sheet/generate') }
+  const handleGenerate = async (format) => {
+    setGenerating(true)
+    try {
+      const res = await fetch('/api/term-sheet/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data, format }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'term-sheet-' + (data.razonSocial || 'credito') + '-' + Date.now() + '.' + format
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      alert('Error: ' + e.message)
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#F9FAFB', fontFamily: cl.fontFamily }}>
@@ -236,7 +257,10 @@ export default function TermSheetPage() {
             <button onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0} style={{ padding: '10px 20px', fontSize: '0.875rem', fontWeight: 600, border: '1px solid #E5E7EB', borderRadius: '10px', background: '#FFFFFF', color: '#4B5563', cursor: step === 0 ? 'not-allowed' : 'pointer', opacity: step === 0 ? 0.4 : 1 }}>← Anterior</button>
             {step < STEPS.length - 1
               ? <button onClick={() => setStep(s => s + 1)} style={{ padding: '10px 24px', fontSize: '0.875rem', fontWeight: 700, border: 'none', borderRadius: '10px', background: ACCENT, color: '#FFFFFF', cursor: 'pointer' }}>Siguiente →</button>
-              : <button onClick={handleGenerate} disabled={generating} style={{ padding: '10px 24px', fontSize: '0.875rem', fontWeight: 700, border: 'none', borderRadius: '10px', background: '#059669', color: '#FFFFFF', cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.7 : 1 }}>{generating ? 'Generando...' : '↓ Descargar Term Sheet PDF'}</button>}
+              : <div style={{ display: 'flex', gap: '8px' }}>
+      <button onClick={() => handleGenerate('pdf')} disabled={generating} style={{ padding: '10px 18px', fontSize: '0.875rem', fontWeight: 700, border: 'none', borderRadius: '10px', background: '#059669', color: '#FFFFFF', cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.7 : 1 }}>↓ PDF</button>
+      <button onClick={() => handleGenerate('docx')} disabled={generating} style={{ padding: '10px 18px', fontSize: '0.875rem', fontWeight: 700, border: 'none', borderRadius: '10px', background: '#1D4ED8', color: '#FFFFFF', cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.7 : 1 }}>↓ Word</button>
+    </div>}
           </div>
         </div>
         <p style={{ color: '#D1D5DB', fontSize: '0.75rem', textAlign: 'center', marginTop: '2rem' }}>PorCuanto S.A. de C.V.</p>
