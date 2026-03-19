@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { cl } from '@/lib/design'
 
 type AmortizationType = 'bullet' | 'mensual' | 'trimestral' | 'personalizado'
@@ -193,19 +193,46 @@ export default function TermSheetPage() {
   const handleGenerate = async (format: 'pdf' | 'docx') => {
     setGenerating(true)
     try {
-      const res = await fetch('/api/term-sheet/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data, format }),
-      })
-      if (!res.ok) throw new Error(await res.text())
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'term-sheet-' + (data.razonSocial || 'credito') + '-' + Date.now() + '.' + format
-      a.click()
-      URL.revokeObjectURL(url)
+      if (format === 'pdf') {
+        const html2canvas = (await import('html2canvas')).default
+        const { jsPDF } = await import('jspdf')
+        const el = document.getElementById('term-sheet-preview')
+        if (!el) throw new Error('Preview not found')
+        const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' })
+        const imgData = canvas.toDataURL('image/png')
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' })
+        const pageW = pdf.internal.pageSize.getWidth()
+        const pageH = pdf.internal.pageSize.getHeight()
+        const ratio = canvas.height / canvas.width
+        const imgH = pageW * ratio
+        let yPos = 0
+        if (imgH <= pageH) {
+          pdf.addImage(imgData, 'PNG', 0, 0, pageW, imgH)
+        } else {
+          let remaining = canvas.height
+          while (remaining > 0) {
+            const sliceH = Math.min(canvas.height * (pageH / imgH), remaining)
+            pdf.addImage(imgData, 'PNG', 0, yPos === 0 ? 0 : -(imgH - pageH * (canvas.height - remaining) / canvas.height), pageW, imgH)
+            remaining -= sliceH
+            if (remaining > 0) { pdf.addPage(); yPos += pageH }
+          }
+        }
+        pdf.save('term-sheet-' + (data.razonSocial || 'credito') + '-' + Date.now() + '.pdf')
+      } else {
+        const res = await fetch('/api/term-sheet/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data, format }),
+        })
+        if (!res.ok) throw new Error(await res.text())
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'term-sheet-' + (data.razonSocial || 'credito') + '-' + Date.now() + '.docx'
+        a.click()
+        URL.revokeObjectURL(url)
+      }
     } catch (e) {
       alert('Error: ' + (e instanceof Error ? e.message : String(e)))
     } finally {
@@ -252,7 +279,7 @@ export default function TermSheetPage() {
           {step === 0 && <StepAcreditado data={data} onChange={onChange as (k: keyof FormData, v: string) => void} />}
           {step === 1 && <StepCondiciones data={data} onChange={onChange as (k: keyof FormData, v: string) => void} />}
           {step === 2 && <StepPricing data={data} onChange={onChange} />}
-          {step === 3 && <StepResumen data={data} schedule={schedule} />}
+          {step === 3 && <div id="term-sheet-preview"><StepResumen data={data} schedule={schedule} /></div>}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #F3F4F6' }}>
             <button onClick={() => setStep(s => Math.max(0, s - 1))} disabled={step === 0} style={{ padding: '10px 20px', fontSize: '0.875rem', fontWeight: 600, border: '1px solid #E5E7EB', borderRadius: '10px', background: '#FFFFFF', color: '#4B5563', cursor: step === 0 ? 'not-allowed' : 'pointer', opacity: step === 0 ? 0.4 : 1 }}>← Anterior</button>
             {step < STEPS.length - 1
