@@ -115,9 +115,7 @@ export default function GatePage() {
               </a>
             ))}
           </div>
-          <p style={{ color: cl.gray300, fontSize: '0.75rem', textAlign: 'center', marginTop: '2.5rem' }}>
-            PorCuanto S.A. de C.V. · IFC · CNBV · Art. 47 CUITF · LFPDPPP
-          </p>
+          
         </div>
       </div>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');`}</style>
