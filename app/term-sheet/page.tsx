@@ -190,7 +190,7 @@ export default function TermSheetPage() {
   const [generating, setGenerating] = useState(false)
   const onChange = useCallback((k: keyof FormData, v: string | boolean) => { setData(prev => ({ ...prev, [k]: v })) }, [])
   const schedule = buildSchedule(data)
-  const handleGenerate = async (format) => {
+  const handleGenerate = async (format: 'pdf' | 'docx') => {
     setGenerating(true)
     try {
       const res = await fetch('/api/term-sheet/generate', {
