@@ -191,7 +191,7 @@ function StepResumen({ data, schedule }: { data: FormData; schedule: ReturnType<
     </div>
     {schedule.length > 0 && (<>
       <div style={{ fontSize: '0.72rem', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Tabla de amortizacion</div>
-      <div style={{ overflowX: 'auto', border: '1px solid #E5E7EB', borderRadius: '10px', maxHeight: '300px', overflowY: 'auto' }}>
+      <div style={{ overflowX: 'auto', border: '1px solid #E5E7EB', borderRadius: '10px', maxHeight: '200px', overflowY: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.75rem', minWidth: '600px' }}>
           <thead style={{ position: 'sticky', top: 0 }}>
             <tr style={{ background: '#7C3AED' }}>
@@ -343,7 +343,7 @@ export default function TermSheetPage() {
   const btnBase: React.CSSProperties = { padding: '10px 16px', fontSize: '0.82rem', fontWeight: 700, border: 'none', borderRadius: '10px', cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F9FAFB', fontFamily: cl.fontFamily }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#F9FAFB', fontFamily: cl.fontFamily, overflow: 'hidden' }}>
       {showEmail && <EmailModal onClose={() => setShowEmail(false)} onSend={(email) => { setShowEmail(false); alert(`Term sheet enviado a ${email} (integracion pendiente con SendGrid/Resend)`) }} />}
       {showPreview && <PreviewModal data={data} schedule={schedule} onClose={() => setShowPreview(false)} />}
       <div style={{ background: '#FFFFFF', borderBottom: '1px solid #E5E7EB', padding: '0 2rem', height: '60px', display: 'flex', alignItems: 'center' }}>
@@ -353,7 +353,7 @@ export default function TermSheetPage() {
           <span style={{ color: '#9CA3AF', fontSize: '0.82rem', fontWeight: 500 }}>Compliance Hub</span>
         </a>
       </div>
-      <div style={{ background: '#FFFFFF', borderBottom: '1px solid #E5E7EB', padding: '2.5rem 2rem 2rem' }}>
+      <div style={{ background: '#FFFFFF', borderBottom: '1px solid #E5E7EB', padding: '1.2rem 2rem 1rem' }}>
         <div style={{ maxWidth: '960px', margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: ACCENT }} />
@@ -363,8 +363,8 @@ export default function TermSheetPage() {
           <p style={{ color: '#6B7280', fontSize: '0.9rem', margin: 0 }}>Completa los datos para generar el term sheet en PDF o Word.</p>
         </div>
       </div>
-      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '2.5rem 2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '28px' }}>
+      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '1.5rem 2rem', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
           {STEPS.map((s, i) => (<div key={i} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
               <div onClick={() => i < step && setStep(i)} style={{ width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700, cursor: i < step ? 'pointer' : 'default', background: i < step ? '#059669' : i === step ? ACCENT : '#E5E7EB', color: i <= step ? '#FFFFFF' : '#9CA3AF', boxShadow: i === step ? `0 0 0 4px ${ACCENT_LIGHT}` : 'none', transition: 'all 0.2s' }}>{i < step ? 'v' : i + 1}</div>
@@ -373,12 +373,12 @@ export default function TermSheetPage() {
             {i < STEPS.length - 1 && <div style={{ flex: 1, height: '1px', margin: '0 8px', marginBottom: '18px', background: i < step ? '#059669' : '#E5E7EB', transition: 'background 0.3s' }} />}
           </div>))}
         </div>
-        <div style={{ background: '#FFFFFF', border: '1.5px solid #E5E7EB', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+        <div style={{ background: '#FFFFFF', border: '1.5px solid #E5E7EB', borderRadius: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '20px 28px', borderBottom: '1px solid #F3F4F6', background: '#FAFAFA' }}>
             <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#111827' }}>{STEPS[step].label}</div>
             <div style={{ fontSize: '0.82rem', color: '#6B7280', marginTop: '2px' }}>{STEPS[step].desc}</div>
           </div>
-          <div style={{ padding: '24px 28px', minHeight: '380px' }}>
+          <div style={{ padding: '24px 28px', flex: 1, overflowY: 'auto' }}>
             {step === 0 && <StepAcreditado data={data} onChange={onChange as (k: keyof FormData, v: string) => void} />}
             {step === 1 && <StepCondiciones data={data} onChange={onChange as (k: keyof FormData, v: string) => void} />}
             {step === 2 && <StepPricing data={data} onChange={onChange} />}
