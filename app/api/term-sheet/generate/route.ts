@@ -82,31 +82,80 @@ function TermSheetPDF({ data, schedule, logoPath }: { data: any; schedule: any[]
   const tasaLabel = data.tipoTasa === 'fija' ? `${data.tasaAnual}% anual fija` : `${data.referenciaVariable} + ${data.spreadPuntos} pb`
   const summaryItems = [
     ['Acreditado', data.razonSocial || '—'], ['RFC', data.rfc || '—'],
-    ['Tipo de Persona', data.tipoPersona === 'moral' ? 'Persona Moral' : 'Persona Física'],
+    ['Tipo de Persona', data.tipoPersona === 'moral' ? 'Persona Moral' : 'Persona Fisica'],
     ['Rep. Legal', data.representanteLegal || '—'],
-    ['Monto del Crédito', `${data.moneda} $${fmt(monto)}`], ['Plazo', `${data.plazoMeses} meses`],
-    ['Fecha de Disposición', data.fechaDisposicion || '—'], ['Tipo de Amortización', data.tipoAmortizacion],
-    ['Tasa', tasaLabel], ['IVA sobre intereses', data.ivaAplicable ? 'Sí (16%)' : 'No'],
-    ['Underwriting Fee', `${data.underwritingFee || 0}% ($${fmt(uw * monto)})`], ['Comisión de Apertura', `${data.comisionApertura || 0}%`],
+    ['Monto', `${data.moneda} $${fmt(monto)}`], ['Plazo', `${data.plazoMeses} meses`],
+    ['Fecha Disposicion', data.fechaDisposicion || '—'], ['Amortizacion', data.tipoAmortizacion],
+    ['Tasa', tasaLabel], ['IVA intereses', data.ivaAplicable ? 'Si (16%)' : 'No'],
+    ['Underwriting Fee', `${data.underwritingFee || 0}% ($${fmt(uw * monto)})`],
+    ['Comision Apertura', `${data.comisionApertura || 0}%`],
   ]
   const R = React.createElement
   return R(PDFDocument, null, R(Page, { size: 'LETTER', style: S.page },
-    R(View, { style: S.header }, R(Image, { style: S.logo, src: logoPath }), R(View, { style: S.headerRight }, R(Text, { style: S.headerTitle }, 'TERM SHEET — PROPUESTA DE CRÉDITO'), R(Text, { style: S.headerDate }, `Fecha de emisión: ${new Date().toLocaleDateString('es-MX')}`))),
+    R(View, { style: S.header },
+      R(Image, { style: S.logo, src: logoPath }),
+      R(View, { style: S.headerRight },
+        R(Text, { style: S.headerTitle }, 'TERM SHEET - PROPUESTA DE CREDITO'),
+        R(Text, { style: S.headerDate }, `Fecha de emision: ${new Date().toLocaleDateString('es-MX')}`)
+      )
+    ),
     R(Text, { style: S.sectionTitle }, 'Resumen Ejecutivo'),
-    R(View, { style: S.summaryGrid }, ...summaryItems.map(([l, v], i) => R(View, { key: String(i), style: [S.summaryItem, i >= summaryItems.length - 2 ? { borderBottomWidth: 0 } : {}] as any }, R(Text, { style: S.summaryLabel }, l), R(Text, { style: S.summaryValue }, v)))),
-    R(View, { style: S.totalsRow }, ...[['Total Intereses', `$${fmt(totalInt)}`], ['Total Amortización', `$${fmt(totalAmort)}`], ['Total Comisiones', `$${fmt(totalComis)}`], ['Total a Pagar', `$${fmt(totalPago)}`]].map(([l, v], i) => R(View, { key: String(i), style: S.totalBox }, R(Text, { style: S.totalLabel }, l), R(Text, { style: S.totalValue }, v)))),
-    R(Text, { style: S.sectionTitle }, 'Tabla de Amortización'),
-    R(View, { style: S.tableHeader }, R(Text, { style: [S.tableHeaderCellL, { flex: 0.4 }] as any }, '#'), R(Text, { style: [S.tableHeaderCellL, { flex: 1.2 }] as any }, 'Fecha'), R(Text, { style: S.tableHeaderCell }, 'Saldo Ini.'), R(Text, { style: S.tableHeaderCell }, 'Interés'), R(Text, { style: S.tableHeaderCell }, 'Amort.'), R(Text, { style: S.tableHeaderCell }, 'Comis.'), R(Text, { style: [S.tableHeaderCell, { fontFamily: 'Helvetica-Bold' }] as any }, 'Total'), R(Text, { style: S.tableHeaderCell }, 'Saldo Fin.')),
-    ...schedule.map((r: any, i: number) => R(View, { key: String(i), style: i % 2 === 0 ? S.tableRow : S.tableRowAlt }, R(Text, { style: [S.tableCellL, { flex: 0.4 }] as any }, String(r.periodo)), R(Text, { style: [S.tableCellL, { flex: 1.2 }] as any }, r.fecha), R(Text, { style: S.tableCell }, fmt(r.saldoInicial)), R(Text, { style: S.tableCell }, fmt(r.interes)), R(Text, { style: S.tableCell }, fmt(r.amortizacion)), R(Text, { style: [S.tableCell, { color: r.comisiones > 0 ? '#B45309' : '#9CA3AF' }] as any }, r.comisiones > 0 ? fmt(r.comisiones) : '—'), R(Text, { style: [S.tableCell, { fontFamily: 'Helvetica-Bold' }] as any }, fmt(r.total)), R(Text, { style: S.tableCell }, fmt(r.saldoFinal)))),
-    R(View, { style: S.tableTotRow }, R(Text, { style: [S.tableTotCellL, { flex: 0.4 }] as any }, ''), R(Text, { style: [S.tableTotCellL, { flex: 1.2 }] as any }, 'TOTALES'), R(Text, { style: S.tableTotCell }, ''), R(Text, { style: S.tableTotCell }, fmt(totalInt)), R(Text, { style: S.tableTotCell }, fmt(totalAmort)), R(Text, { style: S.tableTotCell }, fmt(totalComis)), R(Text, { style: S.tableTotCell }, fmt(totalPago)), R(Text, { style: S.tableTotCell }, '—')),
-    R(Text, { style: S.footer }, 'PorCuanto S.A. de C.V. · IFC · CNBV · Art. 47 CUITF · LFPDPPP · Documento confidencial, no constituye oferta vinculante.')
+    R(View, { style: S.summaryGrid },
+      ...summaryItems.map(([l, v], i) =>
+        R(View, { key: String(i), style: [S.summaryItem, i >= summaryItems.length - 2 ? { borderBottomWidth: 0 } : {}] as any },
+          R(Text, { style: S.summaryLabel }, l),
+          R(Text, { style: S.summaryValue }, v)
+        )
+      )
+    ),
+    R(View, { style: S.totalsRow },
+      ...[['Total Intereses', `$${fmt(totalInt)}`], ['Total Amortizacion', `$${fmt(totalAmort)}`], ['Total Comisiones', `$${fmt(totalComis)}`], ['Total a Pagar', `$${fmt(totalPago)}`]].map(([l, v], i) =>
+        R(View, { key: String(i), style: S.totalBox }, R(Text, { style: S.totalLabel }, l), R(Text, { style: S.totalValue }, v))
+      )
+    ),
+    R(Text, { style: S.sectionTitle }, 'Tabla de Amortizacion'),
+    R(View, { style: S.tableHeader },
+      R(Text, { style: [S.tableHeaderCellL, { flex: 0.4 }] as any }, '#'),
+      R(Text, { style: [S.tableHeaderCellL, { flex: 1.2 }] as any }, 'Fecha'),
+      R(Text, { style: S.tableHeaderCell }, 'Saldo Ini.'),
+      R(Text, { style: S.tableHeaderCell }, 'Interes'),
+      R(Text, { style: S.tableHeaderCell }, 'Amort.'),
+      R(Text, { style: S.tableHeaderCell }, 'Comis.'),
+      R(Text, { style: [S.tableHeaderCell, { fontFamily: 'Helvetica-Bold' }] as any }, 'Total'),
+      R(Text, { style: S.tableHeaderCell }, 'Saldo Fin.'),
+    ),
+    ...schedule.map((r: any, i: number) =>
+      R(View, { key: String(i), style: i % 2 === 0 ? S.tableRow : S.tableRowAlt },
+        R(Text, { style: [S.tableCellL, { flex: 0.4 }] as any }, String(r.periodo)),
+        R(Text, { style: [S.tableCellL, { flex: 1.2 }] as any }, r.fecha),
+        R(Text, { style: S.tableCell }, fmt(r.saldoInicial)),
+        R(Text, { style: S.tableCell }, fmt(r.interes)),
+        R(Text, { style: S.tableCell }, fmt(r.amortizacion)),
+        R(Text, { style: [S.tableCell, { color: r.comisiones > 0 ? '#B45309' : '#9CA3AF' }] as any }, r.comisiones > 0 ? fmt(r.comisiones) : '-'),
+        R(Text, { style: [S.tableCell, { fontFamily: 'Helvetica-Bold' }] as any }, fmt(r.total)),
+        R(Text, { style: S.tableCell }, fmt(r.saldoFinal)),
+      )
+    ),
+    R(View, { style: S.tableTotRow },
+      R(Text, { style: [S.tableTotCellL, { flex: 0.4 }] as any }, ''),
+      R(Text, { style: [S.tableTotCellL, { flex: 1.2 }] as any }, 'TOTALES'),
+      R(Text, { style: S.tableTotCell }, ''),
+      R(Text, { style: S.tableTotCell }, fmt(totalInt)),
+      R(Text, { style: S.tableTotCell }, fmt(totalAmort)),
+      R(Text, { style: S.tableTotCell }, fmt(totalComis)),
+      R(Text, { style: S.tableTotCell }, fmt(totalPago)),
+      R(Text, { style: S.tableTotCell }, '-'),
+    ),
+    R(Text, { style: S.footer }, 'PorCuanto S.A. de C.V. - IFC - CNBV - Art. 47 CUITF - LFPDPPP - Documento confidencial, no constituye oferta vinculante.')
   ))
 }
 
 async function generateDocx(data: any, schedule: any[]) {
   const monto = parseFloat(data.monto) || 0; const uw = (parseFloat(data.underwritingFee) / 100) || 0
-  const totalInt = schedule.reduce((s: number, r: any) => s + r.interes, 0); const totalAmort = schedule.reduce((s: number, r: any) => s + r.amortizacion, 0)
-  const totalComis = schedule.reduce((s: number, r: any) => s + r.comisiones, 0); const totalPago = schedule.reduce((s: number, r: any) => s + r.total, 0)
+  const totalInt = schedule.reduce((s: number, r: any) => s + r.interes, 0)
+  const totalAmort = schedule.reduce((s: number, r: any) => s + r.amortizacion, 0)
+  const totalComis = schedule.reduce((s: number, r: any) => s + r.comisiones, 0)
+  const totalPago = schedule.reduce((s: number, r: any) => s + r.total, 0)
   const tasaLabel = data.tipoTasa === 'fija' ? `${data.tasaAnual}% anual fija` : `${data.referenciaVariable} + ${data.spreadPuntos} pb`
   const logoBuffer = fs.readFileSync(path.join(process.cwd(), 'public', 'crowdlink-logo.png'))
   const PURPLE = '7C3AED'; const GRAY = '6B7280'; const LIGHT = 'F5F3FF'
@@ -114,9 +163,9 @@ async function generateDocx(data: any, schedule: any[]) {
   const dataCell = (text: string, right = false, bold = false, color = '374151') => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text, size: 17, bold, color, font: 'Calibri' })], alignment: right ? AlignmentType.RIGHT : AlignmentType.LEFT })], margins: { top: 60, bottom: 60, left: 100, right: 100 } })
   const totCell = (text: string, right = false) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text, bold: true, size: 17, color: PURPLE, font: 'Calibri' })], alignment: right ? AlignmentType.RIGHT : AlignmentType.LEFT })], shading: { type: ShadingType.SOLID, color: LIGHT, fill: LIGHT }, margins: { top: 80, bottom: 80, left: 100, right: 100 } })
   const borders = { top: { style: BorderStyle.SINGLE, size: 4, color: 'E5E7EB' }, bottom: { style: BorderStyle.SINGLE, size: 4, color: 'E5E7EB' }, left: { style: BorderStyle.SINGLE, size: 4, color: 'E5E7EB' }, right: { style: BorderStyle.SINGLE, size: 4, color: 'E5E7EB' }, insideH: { style: BorderStyle.SINGLE, size: 2, color: 'E5E7EB' }, insideV: { style: BorderStyle.SINGLE, size: 2, color: 'E5E7EB' } }
-  const summaryItems = [['Acreditado', data.razonSocial || '—'], ['RFC', data.rfc || '—'], ['Representante Legal', data.representanteLegal || '—'], ['Tipo de Persona', data.tipoPersona === 'moral' ? 'Persona Moral' : 'Persona Física'], ['Monto del Crédito', `${data.moneda} $${fmt(monto)}`], ['Plazo', `${data.plazoMeses} meses`], ['Fecha de Disposición', data.fechaDisposicion || '—'], ['Tipo de Amortización', data.tipoAmortizacion], ['Tasa', tasaLabel], ['IVA sobre intereses', data.ivaAplicable ? 'Sí (16%)' : 'No'], ['Underwriting Fee', `${data.underwritingFee || 0}% ($${fmt(uw * monto)})`], ['Comisión de Apertura', `${data.comisionApertura || 0}%`], ['Total Intereses', `$${fmt(totalInt)}`], ['Total Amortización', `$${fmt(totalAmort)}`], ['Total Comisiones', `$${fmt(totalComis)}`], ['Total a Pagar', `$${fmt(totalPago)}`]]
+  const summaryItems = [['Acreditado', data.razonSocial || '—'], ['RFC', data.rfc || '—'], ['Representante Legal', data.representanteLegal || '—'], ['Tipo de Persona', data.tipoPersona === 'moral' ? 'Persona Moral' : 'Persona Fisica'], ['Monto del Credito', `${data.moneda} $${fmt(monto)}`], ['Plazo', `${data.plazoMeses} meses`], ['Fecha de Disposicion', data.fechaDisposicion || '—'], ['Tipo de Amortizacion', data.tipoAmortizacion], ['Tasa', tasaLabel], ['IVA sobre intereses', data.ivaAplicable ? 'Si (16%)' : 'No'], ['Underwriting Fee', `${data.underwritingFee || 0}% ($${fmt(uw * monto)})`], ['Comision de Apertura', `${data.comisionApertura || 0}%`], ['Total Intereses', `$${fmt(totalInt)}`], ['Total Amortizacion', `$${fmt(totalAmort)}`], ['Total Comisiones', `$${fmt(totalComis)}`], ['Total a Pagar', `$${fmt(totalPago)}`]]
   const summaryRows = summaryItems.map(([label, value]) => new TableRow({ children: [new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, size: 17, color: GRAY, font: 'Calibri' })] })], width: { size: 35, type: WidthType.PERCENTAGE }, shading: { type: ShadingType.SOLID, color: 'F9FAFB', fill: 'F9FAFB' }, margins: { top: 80, bottom: 80, left: 120, right: 80 } }), new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: value, size: 17, font: 'Calibri', color: '111827' })] })], width: { size: 65, type: WidthType.PERCENTAGE }, margins: { top: 80, bottom: 80, left: 120, right: 80 } })] }))
-  const doc = new DocxDocument({ sections: [{ properties: { page: { margin: { top: 720, bottom: 720, left: 900, right: 900 } } }, children: [new Paragraph({ children: [new ImageRun({ data: logoBuffer, transformation: { width: 140, height: 35 }, type: 'png' })], spacing: { after: 200 } }), new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: PURPLE } }, spacing: { after: 300 }, children: [] }), new Paragraph({ children: [new TextRun({ text: 'TERM SHEET — PROPUESTA DE CRÉDITO', bold: true, size: 28, color: PURPLE, font: 'Calibri' })], spacing: { after: 80 } }), new Paragraph({ children: [new TextRun({ text: `Fecha de emisión: ${new Date().toLocaleDateString('es-MX')}`, size: 18, color: GRAY, font: 'Calibri' })], spacing: { after: 400 } }), new Paragraph({ children: [new TextRun({ text: 'RESUMEN EJECUTIVO', bold: true, size: 20, color: PURPLE, font: 'Calibri' })], spacing: { after: 160 } }), new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: summaryRows, borders }), new Paragraph({ children: [], spacing: { after: 400 } }), new Paragraph({ children: [new TextRun({ text: 'TABLA DE AMORTIZACIÓN', bold: true, size: 20, color: PURPLE, font: 'Calibri' })], spacing: { after: 160 } }), new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders, rows: [new TableRow({ tableHeader: true, children: ['#', 'Fecha', 'Saldo Ini.', 'Interés', 'Amort.', 'Comis.', 'Total', 'Saldo Fin.'].map(hdrCell) }), ...schedule.map((r: any) => new TableRow({ children: [dataCell(String(r.periodo)), dataCell(r.fecha), dataCell(fmt(r.saldoInicial), true), dataCell(fmt(r.interes), true), dataCell(fmt(r.amortizacion), true), dataCell(r.comisiones > 0 ? fmt(r.comisiones) : '—', true, false, r.comisiones > 0 ? 'B45309' : '9CA3AF'), dataCell(fmt(r.total), true, true), dataCell(fmt(r.saldoFinal), true)] })), new TableRow({ children: [totCell('TOTALES'), totCell(''), totCell(''), totCell(fmt(totalInt), true), totCell(fmt(totalAmort), true), totCell(fmt(totalComis), true), totCell(fmt(totalPago), true), totCell('—', true)] })] }), new Paragraph({ children: [], spacing: { after: 400 } }), new Paragraph({ border: { top: { style: BorderStyle.SINGLE, size: 4, color: 'E5E7EB' } }, children: [new TextRun({ text: 'PorCuanto S.A. de C.V. · IFC · CNBV · Art. 47 CUITF · LFPDPPP · Documento confidencial, no constituye oferta vinculante.', size: 14, color: '9CA3AF', font: 'Calibri' })], spacing: { before: 200 } })] }] })
+  const doc = new DocxDocument({ sections: [{ properties: { page: { margin: { top: 720, bottom: 720, left: 900, right: 900 } } }, children: [new Paragraph({ children: [new ImageRun({ data: logoBuffer, transformation: { width: 140, height: 35 }, type: 'png' })], spacing: { after: 200 } }), new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: PURPLE } }, spacing: { after: 300 }, children: [] }), new Paragraph({ children: [new TextRun({ text: 'TERM SHEET - PROPUESTA DE CREDITO', bold: true, size: 28, color: PURPLE, font: 'Calibri' })], spacing: { after: 80 } }), new Paragraph({ children: [new TextRun({ text: `Fecha de emision: ${new Date().toLocaleDateString('es-MX')}`, size: 18, color: GRAY, font: 'Calibri' })], spacing: { after: 400 } }), new Paragraph({ children: [new TextRun({ text: 'RESUMEN EJECUTIVO', bold: true, size: 20, color: PURPLE, font: 'Calibri' })], spacing: { after: 160 } }), new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: summaryRows, borders }), new Paragraph({ children: [], spacing: { after: 400 } }), new Paragraph({ children: [new TextRun({ text: 'TABLA DE AMORTIZACION', bold: true, size: 20, color: PURPLE, font: 'Calibri' })], spacing: { after: 160 } }), new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders, rows: [new TableRow({ tableHeader: true, children: ['#', 'Fecha', 'Saldo Ini.', 'Interes', 'Amort.', 'Comis.', 'Total', 'Saldo Fin.'].map(hdrCell) }), ...schedule.map((r: any) => new TableRow({ children: [dataCell(String(r.periodo)), dataCell(r.fecha), dataCell(fmt(r.saldoInicial), true), dataCell(fmt(r.interes), true), dataCell(fmt(r.amortizacion), true), dataCell(r.comisiones > 0 ? fmt(r.comisiones) : '-', true, false, r.comisiones > 0 ? 'B45309' : '9CA3AF'), dataCell(fmt(r.total), true, true), dataCell(fmt(r.saldoFinal), true)] })), new TableRow({ children: [totCell('TOTALES'), totCell(''), totCell(''), totCell(fmt(totalInt), true), totCell(fmt(totalAmort), true), totCell(fmt(totalComis), true), totCell(fmt(totalPago), true), totCell('-', true)] })] }), new Paragraph({ children: [], spacing: { after: 400 } }), new Paragraph({ border: { top: { style: BorderStyle.SINGLE, size: 4, color: 'E5E7EB' } }, children: [new TextRun({ text: 'PorCuanto S.A. de C.V. - IFC - CNBV - Art. 47 CUITF - LFPDPPP - Documento confidencial.', size: 14, color: '9CA3AF', font: 'Calibri' })], spacing: { before: 200 } })] }] })
   return Packer.toBuffer(doc)
 }
 
