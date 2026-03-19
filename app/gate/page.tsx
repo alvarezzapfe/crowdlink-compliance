@@ -10,14 +10,13 @@ export default function GatePage() {
 
   useEffect(() => {
     const load = async () => {
-      // Handle password reset redirect from Supabase
       if (window.location.hash.includes('type=recovery')) {
         window.location.href = '/reset-password' + window.location.hash
         return
       }
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return // sin sesión — mostrar gate igual, sin redirigir
+      if (!user) return
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
       setUser({ email: user.email || '', role: profile?.role || 'empresa' })
     }
@@ -41,19 +40,34 @@ export default function GatePage() {
       tags: ['Ekatena', 'Buró', 'CNBV', 'LFPDPPP'],
       accent: '#059669', accentLight: '#ECFDF5',
     },
+    {
+      id: 'term-sheet', href: '/term-sheet',
+      icon: (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
+      ),
+      label: 'Term Sheets',
+      desc: 'Genera propuestas de crédito con tabla de amortización, tasas, underwriting fee y descarga en PDF.',
+      tags: ['Bullet', 'Mensual', 'Trimestral', 'PDF'],
+      accent: '#7C3AED', accentLight: '#F5F3FF',
+    },
   ]
 
   return (
     <div style={{ minHeight: '100vh', background: cl.gray50, fontFamily: cl.fontFamily }}>
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        {/* Logo bar - no logout button */}
         <div style={{ background: cl.white, borderBottom: `1px solid ${cl.gray200}`, padding: '0 2rem', height: '60px', display: 'flex', alignItems: 'center' }}>
           <img src="/crowdlink-logo.png" alt="Crowdlink" style={{ height: '22px', width: 'auto' }} />
           <div style={{ width: '1px', height: '18px', background: cl.gray200, margin: '0 1rem' }} />
           <span style={{ color: cl.gray400, fontSize: '0.82rem', fontWeight: '500' }}>Compliance Hub</span>
         </div>
         <div style={{ background: cl.white, borderBottom: `1px solid ${cl.gray200}`, padding: '2.5rem 2rem 2rem' }}>
-          <div style={{ maxWidth: '860px', margin: '0 auto' }}>
+          <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3DFFA0' }} />
               <span style={{ color: '#059669', fontSize: '0.75rem', fontWeight: '700', letterSpacing: '0.06em' }}>COMPLIANCE HUB</span>
@@ -62,9 +76,8 @@ export default function GatePage() {
             <p style={{ color: cl.gray500, fontSize: '0.9rem', margin: 0 }}>Selecciona el módulo que deseas operar</p>
           </div>
         </div>
-
         <div style={{ flex: 1, padding: '2.5rem 2rem' }}>
-          <div style={{ maxWidth: '860px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
             {modules.map(m => (
               <a key={m.id} href={m.href} style={{ textDecoration: 'none' }}
                 onMouseEnter={() => setHovered(m.id)} onMouseLeave={() => setHovered(null)}>
@@ -75,7 +88,7 @@ export default function GatePage() {
                   boxShadow: hovered === m.id ? `0 8px 24px rgba(0,0,0,0.09), 0 0 0 4px ${m.accentLight}` : '0 2px 8px rgba(0,0,0,0.05)',
                   transform: hovered === m.id ? 'translateY(-3px)' : 'none',
                   transition: 'all 0.2s ease', cursor: 'pointer',
-                  display: 'flex', flexDirection: 'column', gap: '1.25rem',
+                  display: 'flex', flexDirection: 'column', gap: '1.25rem', height: '100%',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: m.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -92,7 +105,7 @@ export default function GatePage() {
                       <span key={t} style={{ background: cl.gray100, color: cl.gray500, fontSize: '0.7rem', fontWeight: '500', padding: '0.2rem 0.55rem', borderRadius: '6px', border: `1px solid ${cl.gray200}` }}>{t}</span>
                     ))}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '1rem', borderTop: `1px solid ${cl.gray100}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '1rem', borderTop: `1px solid ${cl.gray100}`, marginTop: 'auto' }}>
                     <span style={{ color: m.accent, fontSize: '0.85rem', fontWeight: '700' }}>Acceder al módulo</span>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={m.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: hovered === m.id ? 'translateX(4px)' : 'none', transition: 'transform 0.2s' }}>
                       <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/>
