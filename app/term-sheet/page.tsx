@@ -207,7 +207,7 @@ export default function TermSheetPage() {
       a.click()
       URL.revokeObjectURL(url)
     } catch (e) {
-      alert('Error: ' + e.message)
+      alert('Error: ' + (e instanceof Error ? e.message : String(e)))
     } finally {
       setGenerating(false)
     }
