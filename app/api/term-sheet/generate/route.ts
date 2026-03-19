@@ -208,12 +208,12 @@ export async function POST(req: NextRequest) {
     if (format === 'docx') {
       const buffer = await generateDocx(data, schedule)
       const filename = `term-sheet-${(data.razonSocial || 'credito').replace(/\s+/g, '-')}-${Date.now()}.docx`
-      return new NextResponse(buffer, { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'Content-Disposition': `attachment; filename="${filename}"` } })
+      return new NextResponse(buffer as any, { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'Content-Disposition': `attachment; filename="${filename}"` } })
     }
     if (format === 'pdf') {
       const buffer = await generatePdf(data, schedule)
       const filename = `term-sheet-${(data.razonSocial || 'credito').replace(/\s+/g, '-')}-${Date.now()}.pdf`
-      return new NextResponse(buffer, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${filename}"` } })
+      return new NextResponse(buffer as any, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${filename}"` } })
     }
     return NextResponse.json({ error: 'Invalid format' }, { status: 400 })
   } catch (err: any) {
