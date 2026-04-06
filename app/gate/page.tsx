@@ -25,7 +25,7 @@ export default function GatePage() {
 
   const modules = [
     {
-      id: 'pld', href: '/pld',
+      id: 'pld', href: '/pld', active: true,
       icon: <IconShield size={24} color="#0F7BF4" strokeWidth={1.8} />,
       label: 'Sistema PLD',
       desc: 'Prevención de Lavado de Dinero. Consulta listas negras OFAC, SAT 69-B, ONU y UIF. Reportes CNBV.',
@@ -33,7 +33,7 @@ export default function GatePage() {
       accent: cl.blue, accentLight: cl.blueLight,
     },
     {
-      id: 'kyc', href: '/kyc',
+      id: 'kyc', href: '/kyc', active: true,
       icon: <IconBuilding size={24} color="#059669" strokeWidth={1.8} />,
       label: 'KYC Empresas',
       desc: 'Onboarding y verificación de empresas. Score Ekatena, buró de crédito y validación documental.',
@@ -41,7 +41,7 @@ export default function GatePage() {
       accent: '#059669', accentLight: '#ECFDF5',
     },
     {
-      id: 'term-sheet', href: '/term-sheet',
+      id: 'term-sheet', href: '/term-sheet', active: true,
       icon: (
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -55,6 +55,42 @@ export default function GatePage() {
       desc: 'Genera propuestas de crédito con tabla de amortización, tasas, underwriting fee y descarga en PDF.',
       tags: ['Bullet', 'Mensual', 'Trimestral', 'PDF'],
       accent: '#7C3AED', accentLight: '#F5F3FF',
+    },
+    {
+      id: 'contratos', href: '/contratos', active: true,
+      icon: (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0891B2" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+      ),
+      label: 'Contratos',
+      desc: 'Personaliza contratos de adhesión. Carga tu machote Word, llénalo con wizard o envíaselo al cliente por email.',
+      tags: ['Wizard', 'Word', 'Email', 'Token'],
+      accent: '#0891B2', accentLight: '#ECFEFF',
+    },
+    {
+      id: 'siti', href: '/siti', active: false,
+      icon: (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9333EA" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+        </svg>
+      ),
+      label: 'SITI AA',
+      desc: 'Cumplimiento regulatorio ante la CNBV. Gestión y envío de reportes SITI para Instituciones de Tecnología Financiera.',
+      tags: ['CNBV', 'LRITF', 'CUITF', 'Reportes'],
+      accent: '#9333EA', accentLight: '#FAF5FF',
+    },
+    {
+      id: 'condusef', href: '/condusef', active: false,
+      icon: (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#EA580C" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+      ),
+      label: 'Reportes CONDUSEF',
+      desc: 'Genera y gestiona reportes regulatorios para CONDUSEF: RECA, UNES, reclamaciones y transparencia.',
+      tags: ['RECA', 'UNES', 'REUNE', 'SIPRES'],
+      accent: '#EA580C', accentLight: '#FFF7ED',
     },
   ]
 
@@ -79,22 +115,30 @@ export default function GatePage() {
         <div style={{ flex: 1, padding: '2.5rem 2rem' }}>
           <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
             {modules.map(m => (
-              <a key={m.id} href={m.href} style={{ textDecoration: 'none' }}
-                onMouseEnter={() => setHovered(m.id)} onMouseLeave={() => setHovered(null)}>
+              <a key={m.id} href={m.active ? m.href : undefined}
+                style={{ textDecoration: 'none', cursor: m.active ? 'pointer' : 'default', opacity: m.active ? 1 : 0.6 }}
+                onMouseEnter={() => m.active && setHovered(m.id)}
+                onMouseLeave={() => setHovered(null)}>
                 <div style={{
                   background: cl.white,
                   border: `1.5px solid ${hovered === m.id ? m.accent : cl.gray200}`,
                   borderRadius: '16px', padding: '2rem',
                   boxShadow: hovered === m.id ? `0 8px 24px rgba(0,0,0,0.09), 0 0 0 4px ${m.accentLight}` : '0 2px 8px rgba(0,0,0,0.05)',
                   transform: hovered === m.id ? 'translateY(-3px)' : 'none',
-                  transition: 'all 0.2s ease', cursor: 'pointer',
+                  transition: 'all 0.2s ease',
                   display: 'flex', flexDirection: 'column', gap: '1.25rem', height: '100%',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: m.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {m.icon}
                     </div>
-                    <span style={{ background: m.accentLight, color: m.accent, fontSize: '0.68rem', fontWeight: '700', padding: '0.25rem 0.65rem', borderRadius: '9999px' }}>ACTIVO</span>
+                    <span style={{
+                      background: m.active ? m.accentLight : cl.gray100,
+                      color: m.active ? m.accent : cl.gray400,
+                      fontSize: '0.68rem', fontWeight: '700', padding: '0.25rem 0.65rem', borderRadius: '9999px'
+                    }}>
+                      {m.active ? 'ACTIVO' : 'PRÓXIMAMENTE'}
+                    </span>
                   </div>
                   <div>
                     <h2 style={{ color: cl.gray900, fontSize: '1.1rem', fontWeight: '700', margin: '0 0 0.45rem' }}>{m.label}</h2>
@@ -106,16 +150,19 @@ export default function GatePage() {
                     ))}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '1rem', borderTop: `1px solid ${cl.gray100}`, marginTop: 'auto' }}>
-                    <span style={{ color: m.accent, fontSize: '0.85rem', fontWeight: '700' }}>Acceder al módulo</span>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={m.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: hovered === m.id ? 'translateX(4px)' : 'none', transition: 'transform 0.2s' }}>
-                      <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/>
-                    </svg>
+                    <span style={{ color: m.active ? m.accent : cl.gray400, fontSize: '0.85rem', fontWeight: '700' }}>
+                      {m.active ? 'Acceder al módulo' : 'Disponible próximamente'}
+                    </span>
+                    {m.active && (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={m.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: hovered === m.id ? 'translateX(4px)' : 'none', transition: 'transform 0.2s' }}>
+                        <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/>
+                      </svg>
+                    )}
                   </div>
                 </div>
               </a>
             ))}
           </div>
-          
         </div>
       </div>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');`}</style>
