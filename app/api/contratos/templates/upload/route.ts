@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
   const file = formData.get('file') as File | null
   const nombre = formData.get('nombre') as string
   const descripcion = formData.get('descripcion') as string
+  const tipo_contrato = formData.get('tipo_contrato') as string | null
 
   if (!file || !nombre)
     return NextResponse.json({ error: 'file y nombre son requeridos' }, { status: 400 })
@@ -19,7 +20,6 @@ export async function POST(req: NextRequest) {
 
   const bytes = await file.arrayBuffer()
   const buffer = Buffer.from(bytes)
-
   const safeName = file.name
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -35,13 +35,14 @@ export async function POST(req: NextRequest) {
   if (uploadError)
     return NextResponse.json({ error: `Error subiendo archivo: ${uploadError.message}` }, { status: 500 })
 
-  const { data: { publicUrl } } = supabaseAdmin.storage.from('contratos-templates').getPublicUrl(storageKey)
+  const { data: { publicUrl } } = supabaseAdmin.storage
+    .from('contratos-templates').getPublicUrl(storageKey)
 
   const variables = await detectVariables(buffer)
 
   const { data, error } = await supabaseAdmin
     .from('contratos_templates')
-    .insert({ nombre, descripcion: descripcion || null, file_url: publicUrl, file_name: file.name, variables })
+    .insert({ nombre, descripcion: descripcion || null, file_url: publicUrl, file_name: file.name, variables, tipo_contrato: tipo_contrato || null })
     .select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

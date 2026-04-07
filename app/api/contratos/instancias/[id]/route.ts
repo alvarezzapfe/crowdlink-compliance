@@ -18,9 +18,10 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json()
-  const { datos, status } = body
+  const { datos, status, tipo_persona } = body
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
   if (datos !== undefined) updates.datos = datos
+  if (tipo_persona !== undefined) updates.tipo_persona = tipo_persona
   if (status !== undefined) {
     updates.status = status
     if (status === 'completado') updates.completed_at = new Date().toISOString()
@@ -32,4 +33,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ instancia: data })
+}
+
+export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+  const { error } = await supabaseAdmin
+    .from('contratos_instancias')
+    .delete()
+    .eq('id', params.id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
 }
