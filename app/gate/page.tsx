@@ -26,7 +26,7 @@ export default function GatePage() {
   const modules = [
     {
       id: 'pld', href: '/pld', active: true,
-      icon: <IconShield size={24} color="#0F7BF4" strokeWidth={1.8} />,
+      icon: <IconShield size={18} color="#0F7BF4" strokeWidth={1.8} />,
       label: 'Sistema PLD',
       desc: 'Prevención de Lavado de Dinero. Consulta listas negras OFAC, SAT 69-B, ONU y UIF. Reportes CNBV.',
       tags: ['OFAC', 'SAT 69-B', 'ONU', 'UIF'],
@@ -34,7 +34,7 @@ export default function GatePage() {
     },
     {
       id: 'kyc', href: '/kyc', active: true,
-      icon: <IconBuilding size={24} color="#059669" strokeWidth={1.8} />,
+      icon: <IconBuilding size={18} color="#059669" strokeWidth={1.8} />,
       label: 'KYC Empresas',
       desc: 'Onboarding y verificación de empresas. Score Ekatena, buró de crédito y validación documental.',
       tags: ['Ekatena', 'Buró', 'CNBV', 'LFPDPPP'],
@@ -43,7 +43,7 @@ export default function GatePage() {
     {
       id: 'term-sheet', href: '/term-sheet', active: true,
       icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
           <polyline points="14 2 14 8 20 8"/>
           <line x1="16" y1="13" x2="8" y2="13"/>
@@ -59,7 +59,7 @@ export default function GatePage() {
     {
       id: 'contratos', href: '/contratos', active: true,
       icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0891B2" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0891B2" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
         </svg>
       ),
@@ -71,7 +71,7 @@ export default function GatePage() {
     {
       id: 'siti', href: '/siti', active: false,
       icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9333EA" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9333EA" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
         </svg>
       ),
@@ -83,7 +83,7 @@ export default function GatePage() {
     {
       id: 'condusef', href: '/condusef', active: false,
       icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#EA580C" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EA580C" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
         </svg>
       ),
@@ -103,7 +103,7 @@ export default function GatePage() {
           <span style={{ color: cl.gray400, fontSize: '0.82rem', fontWeight: '500' }}>Compliance Hub</span>
         </div>
         <div style={{ background: cl.white, borderBottom: `1px solid ${cl.gray200}`, padding: '2.5rem 2rem 2rem' }}>
-          <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+          <div style={{ maxWidth: '1300px', margin: '0 auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3DFFA0' }} />
               <span style={{ color: '#059669', fontSize: '0.75rem', fontWeight: '700', letterSpacing: '0.06em' }}>COMPLIANCE HUB</span>
@@ -112,8 +112,8 @@ export default function GatePage() {
             <p style={{ color: cl.gray500, fontSize: '0.9rem', margin: 0 }}>Selecciona el módulo que deseas operar</p>
           </div>
         </div>
-        <div style={{ flex: 1, padding: '2.5rem 2rem' }}>
-          <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
+        <div style={{ flex: 1, padding: '2rem' }}>
+          <div style={{ maxWidth: '1300px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '1rem' }}>
             {modules.map(m => (
               <a key={m.id} href={m.active ? m.href : undefined}
                 style={{ textDecoration: 'none', cursor: m.active ? 'pointer' : 'default', opacity: m.active ? 1 : 0.6 }}
@@ -122,27 +122,27 @@ export default function GatePage() {
                 <div style={{
                   background: cl.white,
                   border: `1.5px solid ${hovered === m.id ? m.accent : cl.gray200}`,
-                  borderRadius: '16px', padding: '2rem',
+                  borderRadius: '12px', padding: '1.25rem',
                   boxShadow: hovered === m.id ? `0 8px 24px rgba(0,0,0,0.09), 0 0 0 4px ${m.accentLight}` : '0 2px 8px rgba(0,0,0,0.05)',
                   transform: hovered === m.id ? 'translateY(-3px)' : 'none',
                   transition: 'all 0.2s ease',
                   display: 'flex', flexDirection: 'column', gap: '1.25rem', height: '100%',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ width: '52px', height: '52px', borderRadius: '12px', background: m.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: m.accentLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {m.icon}
                     </div>
                     <span style={{
                       background: m.active ? m.accentLight : cl.gray100,
                       color: m.active ? m.accent : cl.gray400,
-                      fontSize: '0.68rem', fontWeight: '700', padding: '0.25rem 0.65rem', borderRadius: '9999px'
+                      fontSize: '0.6rem', fontWeight: '700', padding: '0.25rem 0.65rem', borderRadius: '9999px'
                     }}>
-                      {m.active ? 'ACTIVO' : 'PRÓXIMAMENTE'}
+                      {m.active ? 'ACTIVO' : 'PRÓXIMO'}
                     </span>
                   </div>
                   <div>
-                    <h2 style={{ color: cl.gray900, fontSize: '1.1rem', fontWeight: '700', margin: '0 0 0.45rem' }}>{m.label}</h2>
-                    <p style={{ color: cl.gray500, fontSize: '0.85rem', margin: 0, lineHeight: 1.65 }}>{m.desc}</p>
+                    <h2 style={{ color: cl.gray900, fontSize: '0.88rem', fontWeight: '700', margin: '0 0 0.3rem' }}>{m.label}</h2>
+                    <p style={{ color: cl.gray500, fontSize: '0.75rem', margin: 0, lineHeight: 1.55 }}>{m.desc}</p>
                   </div>
                   <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                     {m.tags.map(t => (
@@ -151,7 +151,7 @@ export default function GatePage() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '1rem', borderTop: `1px solid ${cl.gray100}`, marginTop: 'auto' }}>
                     <span style={{ color: m.active ? m.accent : cl.gray400, fontSize: '0.85rem', fontWeight: '700' }}>
-                      {m.active ? 'Acceder al módulo' : 'Disponible próximamente'}
+                      {m.active ? 'Acceder →' : 'Próximamente'}
                     </span>
                     {m.active && (
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={m.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: hovered === m.id ? 'translateX(4px)' : 'none', transition: 'transform 0.2s' }}>
