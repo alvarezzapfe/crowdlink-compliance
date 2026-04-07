@@ -19,7 +19,12 @@ export async function POST(req: NextRequest) {
 
   const bytes = await file.arrayBuffer()
   const buffer = Buffer.from(bytes)
-  const storageKey = `templates/${Date.now()}_${file.name.replace(/\s/g, '_')}`
+
+  const safeName = file.name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+  const storageKey = `templates/${Date.now()}_${safeName}`
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from('contratos-templates')
