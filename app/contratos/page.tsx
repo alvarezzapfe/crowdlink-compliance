@@ -583,7 +583,7 @@ function WizardContratos({ instancia, onDone }: { instancia: Instancia; onDone: 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           {currentStep.fields.map(field => (
             <div key={field.key} style={{ gridColumn: field.wide ? '1 / -1' : 'auto' }}>
-              <label style={sharedStyles.label}>{field.label}</label>
+              <label style={{ ...sharedStyles.label, color: datos[field.key]?.trim() ? cl.gray600 : '#92400E' }}>{field.label}{!datos[field.key]?.trim() && ' *'}</label>
               <input value={datos[field.key] || ''} onChange={e => setDatos(p => ({ ...p, [field.key]: e.target.value }))} placeholder={field.placeholder} style={sharedStyles.input} />
             </div>
           ))}

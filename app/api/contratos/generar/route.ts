@@ -21,9 +21,27 @@ export async function POST(req: NextRequest) {
   const template = instancia.contratos_templates as { file_url: string; file_name: string; variables: string[] }
   const datos: Record<string, string> = instancia.datos || {}
 
-  const response = await fetch(template.file_url)
-  if (!response.ok) return NextResponse.json({ error: 'No se pudo descargar el template' }, { status: 500 })
-  const templateBuffer = Buffer.from(await response.arrayBuffer())
+  const fileKey = template.file_url.split('/contratos-templates/')[1]?.split('?')[0]
+  let templateBuffer: Buffer
+
+  if (fileKey) {
+    const { data: signedData, error: signedError } = await supabaseAdmin.storage
+      .from('contratos-templates')
+      .createSignedUrl(decodeURIComponent(fileKey), 60)
+    if (signedError || !signedData?.signedUrl) {
+      const response = await fetch(template.file_url)
+      if (!response.ok) return NextResponse.json({ error: 'No se pudo descargar el template' }, { status: 500 })
+      templateBuffer = Buffer.from(await response.arrayBuffer())
+    } else {
+      const response = await fetch(signedData.signedUrl)
+      if (!response.ok) return NextResponse.json({ error: 'No se pudo descargar el template' }, { status: 500 })
+      templateBuffer = Buffer.from(await response.arrayBuffer())
+    }
+  } else {
+    const response = await fetch(template.file_url)
+    if (!response.ok) return NextResponse.json({ error: 'No se pudo descargar el template' }, { status: 500 })
+    templateBuffer = Buffer.from(await response.arrayBuffer())
+  }
 
   const outputBuffer = await substituteVariables(templateBuffer, datos)
 
@@ -54,6 +72,7 @@ async function substituteVariables(buffer: Buffer, datos: Record<string, string>
     if (!file) continue
     let content = await file.async('string')
     for (const [key, value] of Object.entries(datos)) {
+      if (!value) continue
       const escaped = value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       content = content.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), escaped)
     }
