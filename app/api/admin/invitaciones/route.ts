@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_API_KEY}` },
       body: JSON.stringify({
-        from: 'Crowdlink Compliance <noreply@crowdlink.mx>',
+        from: 'Crowdlink Compliance <onboarding@resend.dev>',
         to: email,
         subject: 'Invitación — Crowdlink Compliance Hub',
         html: `<div style="font-family:-apple-system,sans-serif;max-width:520px;margin:0 auto">
