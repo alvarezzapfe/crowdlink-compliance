@@ -98,9 +98,18 @@ export default function GatePage() {
     <div style={{ minHeight: '100vh', background: cl.gray50, fontFamily: cl.fontFamily }}>
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ background: cl.white, borderBottom: `1px solid ${cl.gray200}`, padding: '0 2rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <img src="/crowdlink-logo.png" alt="Crowdlink" style={{ height: '22px', width: 'auto' }} />
-          <div style={{ width: '1px', height: '18px', background: cl.gray200, margin: '0 1rem' }} />
-          <span style={{ color: cl.gray400, fontSize: '0.82rem', fontWeight: '500' }}>Compliance Hub</span>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <img src="/crowdlink-logo.png" alt="Crowdlink" style={{ height: '22px', width: 'auto' }} />
+            <div style={{ width: '1px', height: '18px', background: cl.gray200, margin: '0 1rem' }} />
+            <span style={{ color: cl.gray400, fontSize: '0.82rem', fontWeight: '500' }}>Compliance Hub</span>
+          </div>
+          <a href="/admin/usuarios" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#64748B', fontSize: '0.78rem', fontWeight: '500', textDecoration: 'none', padding: '0.4rem 0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            Usuarios
+          </a>
         </div>
         <div style={{ background: cl.white, borderBottom: `1px solid ${cl.gray200}`, padding: '2.5rem 2rem 2rem' }}>
           <div style={{ maxWidth: '1300px', margin: '0 auto' }}>
