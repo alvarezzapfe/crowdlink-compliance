@@ -97,7 +97,7 @@ export default function GatePage() {
   return (
     <div style={{ minHeight: '100vh', background: cl.gray50, fontFamily: cl.fontFamily }}>
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ background: cl.white, borderBottom: `1px solid ${cl.gray200}`, padding: '0 2rem', height: '60px', display: 'flex', alignItems: 'center' }}>
+        <div style={{ background: cl.white, borderBottom: `1px solid ${cl.gray200}`, padding: '0 2rem', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <img src="/crowdlink-logo.png" alt="Crowdlink" style={{ height: '22px', width: 'auto' }} />
           <div style={{ width: '1px', height: '18px', background: cl.gray200, margin: '0 1rem' }} />
           <span style={{ color: cl.gray400, fontSize: '0.82rem', fontWeight: '500' }}>Compliance Hub</span>
