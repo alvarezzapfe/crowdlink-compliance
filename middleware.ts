@@ -23,6 +23,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/invite/') ||
     pathname.startsWith('/api/') ||
     pathname.startsWith('/contratos/fill/') ||
+    pathname.startsWith('/register/') ||
     pathname.match(/\.(png|ico|svg|jpg|jpeg|webp|css|js)$/)
   ) {
     return NextResponse.next()
