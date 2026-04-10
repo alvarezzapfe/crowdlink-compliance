@@ -103,6 +103,11 @@ export default function GatePage() {
             <div style={{ width: '1px', height: '18px', background: cl.gray200, margin: '0 1rem' }} />
             <span style={{ color: cl.gray400, fontSize: '0.82rem', fontWeight: '500' }}>Compliance Hub</span>
           </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <a href="/faq" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#64748B', fontSize: '0.78rem', fontWeight: '500', textDecoration: 'none', padding: '0.4rem 0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            FAQ
+          </a>
           <a href="/admin/usuarios" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#64748B', fontSize: '0.78rem', fontWeight: '500', textDecoration: 'none', padding: '0.4rem 0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
@@ -110,6 +115,7 @@ export default function GatePage() {
             </svg>
             Usuarios
           </a>
+          </div>
         </div>
         <div style={{ background: cl.white, borderBottom: `1px solid ${cl.gray200}`, padding: '2.5rem 2rem 2rem' }}>
           <div style={{ maxWidth: '1300px', margin: '0 auto' }}>
