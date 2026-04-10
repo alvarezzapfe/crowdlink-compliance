@@ -81,6 +81,7 @@ export default function ClientFillPage({ params }: { params: { token: string } }
   const [datos, setDatos] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -118,19 +119,25 @@ export default function ClientFillPage({ params }: { params: { token: string } }
 
   async function handleSubmit() {
     setSubmitting(true)
-    const res = await fetch(`/api/contratos/token/${params.token}`, {
+    const saveRes = await fetch(`/api/contratos/token/${params.token}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ datos, status: 'completado' }),
     })
-    const data = await res.json()
+    const saveData = await saveRes.json()
+    if (!saveRes.ok) { setError(saveData.error || 'Error al enviar'); setSubmitting(false); return }
+    const genRes = await fetch('/api/contratos/generar', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ instancia_id: saveData.instancia_id }),
+    })
+    const genData = await genRes.json()
     setSubmitting(false)
-    if (data.ok) setDone(true)
-    else setError(data.error || 'Error al enviar')
+    if (genData.download_url) setDownloadUrl(genData.download_url)
+    setDone(true)
   }
 
   if (loading) return <LoadingScreen />
   if (error) return <ErrorScreen message={error} />
-  if (done) return <SuccessScreen nombre={instancia?.nombre_cliente || ''} />
+  if (done) return <SuccessScreen nombre={instancia?.nombre_cliente || ''} downloadUrl={downloadUrl} />
   if (!instancia) return <ErrorScreen message="Contrato no encontrado" />
 
   const tipo = (instancia.template?.tipo_contrato || 'sol_deuda_sin_garantia') as TipoContrato
@@ -281,7 +288,7 @@ function ErrorScreen({ message }: { message: string }) {
   )
 }
 
-function SuccessScreen({ nombre }: { nombre: string }) {
+function SuccessScreen({ nombre, downloadUrl }: { nombre: string; downloadUrl: string | null }) {
   return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#F8FAFC', fontFamily:'sans-serif' }}>
       <div style={{ textAlign:'center', maxWidth:'440px', padding:'2rem' }}>
@@ -289,7 +296,20 @@ function SuccessScreen({ nombre }: { nombre: string }) {
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
         <h1 style={{ color:'#0F172A', fontSize:'1.5rem', fontWeight:'800', margin:'0 0 0.75rem', letterSpacing:'-0.02em' }}>¡Listo, {nombre}!</h1>
-        <p style={{ color:'#64748B', fontSize:'0.9rem', lineHeight:1.7, margin:'0 0 1.75rem' }}>Tu información fue enviada. El equipo de Crowdlink preparará tu contrato y te contactará pronto.</p>
+        <p style={{ color:'#64748B', fontSize:'0.9rem', lineHeight:1.7, margin:'0 0 1.5rem' }}>Tu información fue enviada. A continuación puedes descargar tu contrato.</p>
+        {downloadUrl ? (
+          <div style={{ marginBottom:'1.5rem', textAlign:'center' }}>
+            <a href={downloadUrl} target="_blank" rel="noreferrer"
+              style={{ display:'inline-flex', alignItems:'center', gap:'0.5rem', background:'#1E6FF1', color:'white', textDecoration:'none', padding:'0.85rem 1.75rem', borderRadius:'10px', fontSize:'0.9rem', fontWeight:'600' }}>
+              ⬇ Descargar contrato Word
+            </a>
+            <p style={{ color:'#94A3B8', fontSize:'0.75rem', margin:'0.75rem 0 0' }}>El equipo de Crowdlink también recibe una copia.</p>
+          </div>
+        ) : (
+          <div style={{ background:'#FFFBEB', border:'1px solid #FDE68A', borderRadius:'10px', padding:'0.85rem 1rem', marginBottom:'1.5rem' }}>
+            <p style={{ color:'#92400E', fontSize:'0.78rem', margin:0 }}>⏳ Generando contrato… recibirás el documento por email.</p>
+          </div>
+        )}
         <div style={{ background:'linear-gradient(135deg,#ECFEFF,#F0F9FF)', border:'1px solid #BAE6FD', borderRadius:'12px', padding:'1rem 1.25rem' }}>
           <p style={{ color:'#0369A1', fontSize:'0.8rem', margin:0 }}>Dudas: <strong>contacto@crowdlink.mx</strong> · <strong>55 5160 9091</strong></p>
         </div>
