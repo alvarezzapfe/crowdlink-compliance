@@ -9,22 +9,22 @@ const supabaseAdmin = createClient(
 export async function GET(_: NextRequest, { params }: { params: { token: string } }) {
   const { data, error } = await supabaseAdmin
     .from('contratos_instancias')
-    .select('*, contratos_templates(nombre, variables)')
+    .select('*, contratos_templates(nombre, variables, tipo_contrato)')
     .eq('token', params.token)
     .single()
+
   if (error || !data) return NextResponse.json({ error: 'Token inválido o no encontrado' }, { status: 404 })
   if (data.token_expires_at && new Date(data.token_expires_at) < new Date())
     return NextResponse.json({ error: 'Este link ha expirado' }, { status: 410 })
   if (data.status === 'generado')
     return NextResponse.json({ error: 'Este contrato ya fue completado' }, { status: 409 })
+
   return NextResponse.json({
     instancia: {
-      id: data.id,
-      nombre_cliente: data.nombre_cliente,
-      razon_social: data.razon_social,
-      rfc: data.rfc,
-      datos: data.datos,
-      status: data.status,
+      id: data.id, nombre_cliente: data.nombre_cliente,
+      razon_social: data.razon_social, rfc: data.rfc,
+      datos: data.datos, status: data.status,
+      tipo_persona: data.tipo_persona,
       template: data.contratos_templates,
     }
   })
@@ -32,22 +32,27 @@ export async function GET(_: NextRequest, { params }: { params: { token: string 
 
 export async function PATCH(req: NextRequest, { params }: { params: { token: string } }) {
   const body = await req.json()
-  const { datos } = body
+  const { datos, tipo_persona, status } = body
+
   const { data: instancia, error: findError } = await supabaseAdmin
     .from('contratos_instancias')
     .select('id, token_expires_at, status')
     .eq('token', params.token)
     .single()
+
   if (findError || !instancia) return NextResponse.json({ error: 'Token inválido' }, { status: 404 })
   if (instancia.token_expires_at && new Date(instancia.token_expires_at) < new Date())
     return NextResponse.json({ error: 'Este link ha expirado' }, { status: 410 })
   if (instancia.status === 'generado')
     return NextResponse.json({ error: 'Este contrato ya fue completado' }, { status: 409 })
+
+  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (datos !== undefined) updates.datos = datos
+  if (tipo_persona !== undefined) updates.tipo_persona = tipo_persona
+  if (status === 'completado') { updates.status = 'completado'; updates.completed_at = new Date().toISOString() }
+
   const { data, error } = await supabaseAdmin
-    .from('contratos_instancias')
-    .update({ datos, status: 'completado', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq('id', instancia.id)
-    .select().single()
+    .from('contratos_instancias').update(updates).eq('id', instancia.id).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true, instancia_id: data.id })
 }
