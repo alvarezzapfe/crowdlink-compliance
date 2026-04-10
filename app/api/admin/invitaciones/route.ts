@@ -32,8 +32,11 @@ export async function POST(req: NextRequest) {
   const { email, nombre, role } = await req.json()
   if (!email || !role) return NextResponse.json({ error: 'email y role son requeridos' }, { status: 400 })
 
+  // Si ya existe invitación pendiente, la revocamos y creamos una nueva
   const { data: existing } = await supabaseAdmin.from('user_invitations').select('id').eq('email', email).eq('status', 'pending').single()
-  if (existing) return NextResponse.json({ error: 'Ya existe una invitación pendiente para ese email' }, { status: 409 })
+  if (existing) {
+    await supabaseAdmin.from('user_invitations').update({ status: 'revoked' }).eq('id', existing.id)
+  }
 
   const { data: invite, error } = await supabaseAdmin.from('user_invitations')
     .insert({ email, nombre: nombre || null, role, invited_by: caller.user.id })
