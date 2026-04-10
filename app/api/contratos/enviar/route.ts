@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_API_KEY}` },
       body: JSON.stringify({
-        from: 'Crowdlink Compliance <noreply@crowdlink.mx>',
+        from: 'Crowdlink Compliance <noreply@plinius.mx>',
         to: instancia.email_cliente,
         subject: `Crowdlink — Completa tu contrato: ${templateNombre}`,
         html: `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px">
