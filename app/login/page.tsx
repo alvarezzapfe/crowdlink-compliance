@@ -75,8 +75,10 @@ export default function LoginPage() {
     })
     const data = await res.json()
     setLoading(false)
-    if (data.verified) { window.location.href = '/gate' }
-    else { setError('Código incorrecto. Intenta de nuevo.') }
+    if (data.verified) {
+      await new Promise(r => setTimeout(r, 500))
+      window.location.href = '/gate'
+    } else { setError('Código incorrecto. Intenta de nuevo.') }
   }
 
   async function handleForgot() {
