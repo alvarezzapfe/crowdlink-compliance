@@ -41,17 +41,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login?error=inactive', request.url))
   }
 
-  // Verificar 2FA — cookie httpOnly O login reciente (últimos 5 min)
-  const totp2fa = request.cookies.get('cl_2fa_verified')
-  const has2fa = totp2fa && totp2fa.value === user.id
-  const lastSignIn = user.last_sign_in_at ? new Date(user.last_sign_in_at) : null
-  const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000)
-  const recentLogin = lastSignIn && lastSignIn > fiveMinAgo
-
-  if (!has2fa && !recentLogin) {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
-
   if (pathname.startsWith('/admin/usuarios') && !['super_admin', 'admin'].includes(profile.role)) {
     return NextResponse.redirect(new URL('/gate', request.url))
   }
