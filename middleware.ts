@@ -31,23 +31,28 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-
   if (!user) return NextResponse.redirect(new URL('/login', request.url))
 
   const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, activo')
-    .eq('id', user.id)
-    .single()
+    .from('profiles').select('role, activo').eq('id', user.id).single()
 
   if (!profile?.activo) {
     await supabase.auth.signOut()
     return NextResponse.redirect(new URL('/login?error=inactive', request.url))
   }
 
-  const role = profile.role as string
+  // Verificar 2FA — cookie httpOnly O login reciente (últimos 5 min)
+  const totp2fa = request.cookies.get('cl_2fa_verified')
+  const has2fa = totp2fa && totp2fa.value === user.id
+  const lastSignIn = user.last_sign_in_at ? new Date(user.last_sign_in_at) : null
+  const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000)
+  const recentLogin = lastSignIn && lastSignIn > fiveMinAgo
 
-  if (pathname.startsWith('/admin/usuarios') && !['super_admin', 'admin'].includes(role)) {
+  if (!has2fa && !recentLogin) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  if (pathname.startsWith('/admin/usuarios') && !['super_admin', 'admin'].includes(profile.role)) {
     return NextResponse.redirect(new URL('/gate', request.url))
   }
 
