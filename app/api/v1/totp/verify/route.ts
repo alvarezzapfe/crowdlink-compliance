@@ -79,7 +79,9 @@ export async function POST(req: NextRequest) {
       const { data: totp } = await supabaseAdmin
         .from('admin_totp').select('secret, verified').eq('user_id', user.id).single()
       if (!totp || !totp.verified) return NextResponse.json({ error: '2FA no configurado' }, { status: 400 })
-      const valid = await verifyTotp(totp.secret, code)
+      console.log('TOTP verify — secret:', totp.secret, 'code:', code, 'time:', Date.now())
+    const valid = await verifyTotp(totp.secret, code)
+    console.log('TOTP result:', valid)
       if (!valid) return NextResponse.json({ error: 'Código incorrecto o expirado' }, { status: 400 })
       return NextResponse.json({ ok: true })
     }
