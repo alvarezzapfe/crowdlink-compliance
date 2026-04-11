@@ -319,7 +319,7 @@ export default function PldPage() {
     const init = async () => {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { window.location.href = '/pld/login'; return }
+      if (!user) { window.location.href = '/login'; return }
       setUserEmail(user.email || '')
 
       const adminEmails = ['luis@crowdlink.mx', 'lalvarezzapfe@gmail.com']
@@ -453,7 +453,7 @@ export default function PldPage() {
     inactivityTimer.current = setTimeout(async () => {
       const supabase = (await import('@/lib/supabase-client')).createClient()
       await supabase.auth.signOut()
-      window.location.href = '/pld/login'
+      window.location.href = '/login'
     }, INACTIVITY_LIMIT)
   }, [INACTIVITY_LIMIT, WARNING_BEFORE])
 
