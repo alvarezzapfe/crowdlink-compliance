@@ -1,34 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
-const PLD_EMAILS = ['luis@crowdlink.mx', 'lalvarezzapfe@gmail.com', 'pld@crowdlink.mx']
-const KYC_ADMIN_EMAILS = ['luis@crowdlink.mx', 'lalvarezzapfe@gmail.com']
-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  if (pathname === '/') {
-    return NextResponse.redirect(new URL('/gate', request.url))
-  }
+  const PUBLIC_ROUTES = ['/', '/login', '/faq', '/reset-password']
+  const PUBLIC_PREFIXES = ['/auth/', '/invite/', '/api/', '/contratos/fill/', '/register/', '/kyc', '/pld/login']
 
-  if (
-    pathname === '/gate' ||
-    pathname === '/kyc' ||
-    pathname === '/kyc/inicio' ||
-    pathname === '/kyc/wizard' ||
-    pathname === '/login' ||
-    pathname === '/reset-password' ||
-    pathname === '/pld/login' ||
-    pathname.startsWith('/auth/') ||
-    pathname.startsWith('/invite/') ||
-    pathname.startsWith('/api/') ||
-    pathname.startsWith('/contratos/fill/') ||
-    pathname.startsWith('/register/') ||
-    pathname.startsWith('/faq') ||
-    pathname.match(/\.(png|ico|svg|jpg|jpeg|webp|css|js)$/)
-  ) {
-    return NextResponse.next()
-  }
+  const isPublic =
+    PUBLIC_ROUTES.includes(pathname) ||
+    PUBLIC_PREFIXES.some(p => pathname.startsWith(p)) ||
+    !!pathname.match(/\.(png|ico|svg|jpg|jpeg|webp|css|js|woff|woff2)$/)
+
+  if (isPublic) return NextResponse.next()
 
   let response = NextResponse.next({ request })
   const supabase = createServerClient(
@@ -48,25 +32,23 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    if (pathname.startsWith('/pld')) return NextResponse.redirect(new URL('/pld/login', request.url))
-    return NextResponse.redirect(new URL('/login', request.url))
+  if (!user) return NextResponse.redirect(new URL('/login', request.url))
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, activo')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile?.activo) {
+    await supabase.auth.signOut()
+    return NextResponse.redirect(new URL('/login?error=inactive', request.url))
   }
 
-  const email = user.email || ''
+  const role = profile.role as string
 
-  if (pathname.startsWith('/pld')) {
-    if (!PLD_EMAILS.includes(email)) {
-      return NextResponse.redirect(new URL('/kyc/admin', request.url))
-    }
-    return response
-  }
-
-  if (pathname.startsWith('/kyc/admin')) {
-    if (!KYC_ADMIN_EMAILS.includes(email)) {
-      return NextResponse.redirect(new URL('/gate', request.url))
-    }
-    return response
+  if (pathname.startsWith('/admin/usuarios') && !['super_admin', 'admin'].includes(role)) {
+    return NextResponse.redirect(new URL('/gate', request.url))
   }
 
   return response
