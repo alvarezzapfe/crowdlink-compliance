@@ -44,7 +44,7 @@ async function hotp(secret: string, counter: number): Promise<string> {
 
 async function verifyTotp(secret: string, code: string): Promise<boolean> {
   const counter = Math.floor(Date.now() / 1000 / 30)
-  for (const delta of [-1, 0, 1]) {
+  for (const delta of [-2, -1, 0, 1, 2]) {
     const expected = await hotp(secret, counter + delta)
     if (expected === code) return true
   }
