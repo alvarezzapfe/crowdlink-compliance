@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       const valid = await verifyTotp(secret, code)
       if (!valid) return NextResponse.json({ error: 'Código incorrecto' }, { status: 400 })
       await supabaseAdmin.from('admin_totp').update({ verified: true }).eq('user_id', user.id)
-      return NextResponse.json({ ok: true })
+      return NextResponse.json({ ok: true, verified: true })
     } else {
       const { data: totp } = await supabaseAdmin
         .from('admin_totp').select('secret, verified').eq('user_id', user.id).single()
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
     const valid = await verifyTotp(totp.secret, code)
     console.log('TOTP result:', valid)
       if (!valid) return NextResponse.json({ error: 'Código incorrecto o expirado' }, { status: 400 })
-      return NextResponse.json({ ok: true })
+      return NextResponse.json({ ok: true, verified: true })
     }
   } catch (e) {
     console.error(e)
