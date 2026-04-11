@@ -30,6 +30,7 @@ export default function LoginPage() {
     setAccessToken(token)
     const totpRes = await fetch('/api/v1/totp/status', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
     const totpStatus = await totpRes.json()
+    console.log('TOTP status response:', totpStatus)
     setLoading(false)
     if (totpStatus.verified) {
       setStep('totp_verify')
