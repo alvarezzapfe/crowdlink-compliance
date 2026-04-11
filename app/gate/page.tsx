@@ -4,6 +4,25 @@ import { createClient } from '@/lib/supabase-client'
 import { cl } from '@/lib/design'
 import { IconShield, IconBuilding } from '@/components/Icons'
 
+
+function LogoutBtn() {
+  async function handleLogout() {
+    const { createClient } = await import('@/lib/supabase-client')
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    // Borrar cookie 2FA
+    document.cookie = 'cl_2fa_verified=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+    window.location.href = '/'
+  }
+  return (
+    <button onClick={handleLogout}
+      style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#EF4444', fontSize: '0.78rem', fontWeight: '500', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '8px', padding: '0.4rem 0.85rem', cursor: 'pointer', fontFamily: 'inherit' }}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Salir
+    </button>
+  )
+}
+
 export default function GatePage() {
   const [user, setUser] = useState<{ email: string; role: string } | null>(null)
   const [hovered, setHovered] = useState<string | null>(null)
@@ -103,7 +122,7 @@ export default function GatePage() {
             <div style={{ width: '1px', height: '18px', background: cl.gray200, margin: '0 1rem' }} />
             <span style={{ color: cl.gray400, fontSize: '0.82rem', fontWeight: '500' }}>Compliance Hub</span>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <a href="/faq" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#64748B', fontSize: '0.78rem', fontWeight: '500', textDecoration: 'none', padding: '0.4rem 0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             FAQ
@@ -115,6 +134,7 @@ export default function GatePage() {
             </svg>
             Usuarios
           </a>
+          <LogoutBtn />
           </div>
         </div>
         <div style={{ background: cl.white, borderBottom: `1px solid ${cl.gray200}`, padding: '2.5rem 2rem 2rem' }}>
