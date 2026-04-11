@@ -77,8 +77,7 @@ export default function LoginPage() {
     const data = await res.json()
     setLoading(false)
     if (data.verified) {
-      // Usar replace para evitar problemas de hidratación
-      setTimeout(() => { window.location.replace('/gate') }, 100)
+      document.location.href = '/gate'
     } else { setError('Código incorrecto. Intenta de nuevo.') }
   }
 
