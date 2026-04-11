@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     if (error || !user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
 
     const { data: profile } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'admin') return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    if (!['admin', 'super_admin', 'compliance_officer', 'readonly'].includes(profile?.role || '')) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
     const secret = generateBase32Secret()
     const issuer = 'Crowdlink Compliance'
