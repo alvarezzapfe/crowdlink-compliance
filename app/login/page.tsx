@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase-client'
 
-type Step = 'credentials' | 'totp_verify'
+type Step = 'credentials' | 'totp_setup' | 'totp_verify'
 
 export default function LoginPage() {
   const [step, setStep] = useState<Step>('credentials')
@@ -10,6 +10,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [totpCode, setTotpCode] = useState('')
+  const [totpSecret, setTotpSecret] = useState('')
+  const [totpQr, setTotpQr] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [forgotSent, setForgotSent] = useState(false)
@@ -32,17 +34,43 @@ export default function LoginPage() {
     if (totpStatus.verified) {
       setStep('totp_verify')
     } else {
-      await fetch('/api/v1/totp/session', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
-      window.location.href = '/gate'
+      // No tiene 2FA — mostrar setup
+      const setupRes = await fetch('/api/v1/totp/setup', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      const setupData = await setupRes.json()
+      setTotpSecret(setupData.secret)
+      setTotpQr(setupData.qr_url)
+      setStep('totp_setup')
     }
   }
 
-  async function handleTotp() {
+  async function handleTotpSetup() {
     if (totpCode.length !== 6) return
     setLoading(true); setError('')
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token || accessToken
     const res = await fetch('/api/v1/totp/verify', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ code: totpCode, secret: totpSecret, setup: true }),
+    })
+    const data = await res.json()
+    setLoading(false)
+    if (data.ok) {
+      await fetch('/api/v1/totp/session', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      window.location.href = '/gate'
+    } else { setError('Código incorrecto. Intenta de nuevo.') }
+  }
+
+  async function handleTotpVerify() {
+    if (totpCode.length !== 6) return
+    setLoading(true); setError('')
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token || accessToken
+    const res = await fetch('/api/v1/totp/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ code: totpCode }),
     })
     const data = await res.json()
@@ -75,9 +103,10 @@ export default function LoginPage() {
           </div>
         </div>
         <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'20px', padding:'2.5rem', backdropFilter:'blur(20px)' }}>
+
           {step === 'credentials' && (<>
             <h1 style={{ color:'white', fontSize:'1.35rem', fontWeight:'800', margin:'0 0 0.4rem', letterSpacing:'-0.02em' }}>Iniciar sesión</h1>
-            <p style={{ color:'rgba(255,255,255,0.4)', fontSize:'0.85rem', margin:'0 0 2rem', lineHeight:1.5 }}>Accede con tu cuenta de Crowdlink Compliance</p>
+            <p style={{ color:'rgba(255,255,255,0.4)', fontSize:'0.85rem', margin:'0 0 2rem' }}>Accede con tu cuenta de Crowdlink Compliance</p>
             <div style={{ marginBottom:'1rem' }}>
               <label style={{ color:'rgba(255,255,255,0.6)', fontSize:'0.78rem', fontWeight:'500', display:'block', marginBottom:'0.4rem' }}>Email</label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key==='Enter' && handleCredentials()} placeholder="tu@crowdlink.mx" className="input-field"
@@ -88,7 +117,7 @@ export default function LoginPage() {
               <div style={{ position:'relative' }}>
                 <input type={showPass?'text':'password'} value={password} onChange={e => setPassword(e.target.value)} onKeyDown={e => e.key==='Enter' && handleCredentials()} placeholder="••••••••" className="input-field"
                   style={{ width:'100%', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'10px', padding:'0.8rem 2.5rem 0.8rem 1rem', color:'white', fontSize:'0.9rem', fontFamily:'inherit', transition:'all 0.2s' }} />
-                <button onClick={() => setShowPass(!showPass)} style={{ position:'absolute', right:'0.75rem', top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.3)', fontSize:'0.8rem' }}>{showPass?'🙈':'👁'}</button>
+                <button onClick={() => setShowPass(!showPass)} style={{ position:'absolute', right:'0.75rem', top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.3)' }}>{showPass?'🙈':'👁'}</button>
               </div>
             </div>
             {error && <p style={{ color:'#EF4444', fontSize:'0.8rem', margin:'0 0 1rem', padding:'0.6rem 0.85rem', background:'rgba(239,68,68,0.08)', borderRadius:'8px', border:'1px solid rgba(239,68,68,0.15)' }}>{error}</p>}
@@ -101,6 +130,33 @@ export default function LoginPage() {
               : <button onClick={handleForgot} style={{ background:'none', border:'none', color:'rgba(255,255,255,0.35)', fontSize:'0.78rem', cursor:'pointer', fontFamily:'inherit' }}>¿Olvidaste tu contraseña?</button>}
             </div>
           </>)}
+
+          {step === 'totp_setup' && (<>
+            <div style={{ textAlign:'center', marginBottom:'1.5rem' }}>
+              <h2 style={{ color:'white', fontSize:'1.2rem', fontWeight:'800', margin:'0 0 0.4rem', letterSpacing:'-0.02em' }}>Configura tu 2FA</h2>
+              <p style={{ color:'rgba(255,255,255,0.4)', fontSize:'0.82rem', margin:0 }}>Escanea con Google Authenticator</p>
+            </div>
+            {totpQr && (
+              <div style={{ textAlign:'center', marginBottom:'1.25rem' }}>
+                <img src={totpQr} alt="QR 2FA" style={{ width:'160px', height:'160px', borderRadius:'12px', border:'1px solid rgba(255,255,255,0.1)', background:'white', padding:'4px' }} />
+                {totpSecret && <div style={{ marginTop:'0.75rem' }}>
+                  <p style={{ color:'rgba(255,255,255,0.3)', fontSize:'0.7rem', margin:'0 0 0.3rem' }}>Código manual:</p>
+                  <code style={{ background:'rgba(255,255,255,0.06)', padding:'0.3rem 0.6rem', borderRadius:'6px', fontSize:'0.75rem', color:'#3EE8A0', letterSpacing:'0.1em' }}>{totpSecret}</code>
+                </div>}
+              </div>
+            )}
+            <input value={totpCode} onChange={e => setTotpCode(e.target.value.replace(/\D/g,'').slice(0,6))} onKeyDown={e => e.key==='Enter' && handleTotpSetup()}
+              placeholder="000000" maxLength={6} className="input-field"
+              style={{ width:'100%', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'10px', padding:'1rem', color:'white', fontSize:'1.8rem', fontWeight:'700', textAlign:'center', letterSpacing:'0.5em', fontFamily:'monospace', marginBottom:'1.25rem', transition:'all 0.2s' }} />
+            {error && <p style={{ color:'#EF4444', fontSize:'0.8rem', margin:'0 0 1rem', padding:'0.6rem 0.85rem', background:'rgba(239,68,68,0.08)', borderRadius:'8px', border:'1px solid rgba(239,68,68,0.15)' }}>{error}</p>}
+            <button onClick={handleTotpSetup} disabled={totpCode.length!==6||loading} className="btn-p"
+              style={{ width:'100%', background:'linear-gradient(135deg, #3EE8A0, #0891B2)', color:'#050A14', border:'none', borderRadius:'10px', padding:'0.85rem', fontSize:'0.9rem', fontWeight:'700', cursor:(totpCode.length!==6||loading)?'default':'pointer', opacity:(totpCode.length!==6||loading)?0.6:1, fontFamily:'inherit' }}>
+              {loading?'Verificando…':'✓ Activar 2FA y entrar'}
+            </button>
+            <button onClick={() => { setStep('credentials'); setTotpCode(''); setError('') }}
+              style={{ width:'100%', background:'none', border:'none', color:'rgba(255,255,255,0.35)', fontSize:'0.78rem', cursor:'pointer', marginTop:'1rem', fontFamily:'inherit' }}>← Volver</button>
+          </>)}
+
           {step === 'totp_verify' && (<>
             <div style={{ textAlign:'center', marginBottom:'1.75rem' }}>
               <div style={{ width:'52px', height:'52px', borderRadius:'14px', background:'rgba(62,232,160,0.1)', border:'1px solid rgba(62,232,160,0.2)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 1rem' }}>
@@ -109,11 +165,11 @@ export default function LoginPage() {
               <h2 style={{ color:'white', fontSize:'1.2rem', fontWeight:'800', margin:'0 0 0.4rem', letterSpacing:'-0.02em' }}>Verificación 2FA</h2>
               <p style={{ color:'rgba(255,255,255,0.4)', fontSize:'0.82rem', margin:0 }}>Abre Google Authenticator e ingresa el código</p>
             </div>
-            <input value={totpCode} onChange={e => setTotpCode(e.target.value.replace(/\D/g,'').slice(0,6))} onKeyDown={e => e.key==='Enter' && handleTotp()}
+            <input value={totpCode} onChange={e => setTotpCode(e.target.value.replace(/\D/g,'').slice(0,6))} onKeyDown={e => e.key==='Enter' && handleTotpVerify()}
               placeholder="000000" maxLength={6} className="input-field"
               style={{ width:'100%', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'10px', padding:'1rem', color:'white', fontSize:'1.8rem', fontWeight:'700', textAlign:'center', letterSpacing:'0.5em', fontFamily:'monospace', marginBottom:'1.25rem', transition:'all 0.2s' }} />
             {error && <p style={{ color:'#EF4444', fontSize:'0.8rem', margin:'0 0 1rem', padding:'0.6rem 0.85rem', background:'rgba(239,68,68,0.08)', borderRadius:'8px', border:'1px solid rgba(239,68,68,0.15)' }}>{error}</p>}
-            <button onClick={handleTotp} disabled={totpCode.length!==6||loading} className="btn-p"
+            <button onClick={handleTotpVerify} disabled={totpCode.length!==6||loading} className="btn-p"
               style={{ width:'100%', background:'linear-gradient(135deg, #3EE8A0, #0891B2)', color:'#050A14', border:'none', borderRadius:'10px', padding:'0.85rem', fontSize:'0.9rem', fontWeight:'700', cursor:(totpCode.length!==6||loading)?'default':'pointer', opacity:(totpCode.length!==6||loading)?0.6:1, fontFamily:'inherit' }}>
               {loading?'Verificando…':'✓ Entrar al Hub'}
             </button>
