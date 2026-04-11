@@ -78,7 +78,10 @@ export default function LoginPage() {
     const data = await res.json()
     setLoading(false)
     if (data.verified) {
-      document.location.href = '/gate'
+      setLoading(true)
+      setError('')
+      // Forzar navegación completa
+      window.location.assign('https://crowdlink-compliance.vercel.app/gate')
     } else { setError('Código incorrecto. Intenta de nuevo.') }
   }
 
