@@ -29,8 +29,12 @@ export default function LoginPage() {
     const totpRes = await fetch('/api/v1/totp/status', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
     const totpStatus = await totpRes.json()
     setLoading(false)
-    if (totpStatus.verified) { setStep('totp_verify') }
-    else { window.location.href = '/gate' }
+    if (totpStatus.verified) {
+      setStep('totp_verify')
+    } else {
+      await fetch('/api/v1/totp/session', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      window.location.href = '/gate'
+    }
   }
 
   async function handleTotp() {
