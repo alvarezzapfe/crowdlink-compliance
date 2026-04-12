@@ -34,11 +34,17 @@ export async function middleware(request: NextRequest) {
   if (!user) return NextResponse.redirect(new URL('/login', request.url))
 
   const { data: profile } = await supabase
-    .from('profiles').select('role, activo').eq('id', user.id).single()
+    .from('profiles').select('role, activo, session_token').eq('id', user.id).single()
 
   if (!profile?.activo) {
     await supabase.auth.signOut()
     return NextResponse.redirect(new URL('/login?error=inactive', request.url))
+  }
+
+  // Verificar sesión única — cookie debe coincidir con DB
+  const cookieToken = request.cookies.get('cl_session_token')?.value
+  if (!cookieToken || cookieToken !== profile.session_token) {
+    return NextResponse.redirect(new URL('/login?error=session', request.url))
   }
 
   if (pathname.startsWith('/admin/usuarios') && !['super_admin', 'admin'].includes(profile.role)) {

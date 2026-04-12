@@ -64,9 +64,8 @@ export async function POST(req: NextRequest) {
     const code = (body.code || '').trim()
     const isSetup = body.setup === true
 
-    if (!/^\d{6}$/.test(code)) {
+    if (!/^\d{6}$/.test(code))
       return NextResponse.json({ error: 'Código inválido' }, { status: 400 })
-    }
 
     if (isSetup) {
       const secret = (body.secret || '').trim()
@@ -74,17 +73,30 @@ export async function POST(req: NextRequest) {
       const valid = await verifyTotp(secret, code)
       if (!valid) return NextResponse.json({ error: 'Código incorrecto' }, { status: 400 })
       await supabaseAdmin.from('admin_totp').update({ verified: true }).eq('user_id', user.id)
-      return NextResponse.json({ ok: true, verified: true })
     } else {
       const { data: totp } = await supabaseAdmin
         .from('admin_totp').select('secret, verified').eq('user_id', user.id).single()
       if (!totp || !totp.verified) return NextResponse.json({ error: '2FA no configurado' }, { status: 400 })
-      console.log('TOTP verify — secret:', totp.secret, 'code:', code, 'time:', Date.now())
-    const valid = await verifyTotp(totp.secret, code)
-    console.log('TOTP result:', valid)
+      const valid = await verifyTotp(totp.secret, code)
+      console.log('TOTP result:', valid)
       if (!valid) return NextResponse.json({ error: 'Código incorrecto o expirado' }, { status: 400 })
-      return NextResponse.json({ ok: true, verified: true })
     }
+
+    // Generar session token único — invalida sesiones anteriores
+    const sessionToken = crypto.randomUUID()
+    await supabaseAdmin.from('profiles').update({
+      session_token: sessionToken,
+      session_at: new Date().toISOString(),
+    }).eq('id', user.id)
+
+    const res = NextResponse.json({ ok: true, verified: true })
+    res.cookies.set('cl_2fa_verified', user.id, {
+      httpOnly: true, secure: true, sameSite: 'lax', maxAge: 60 * 60 * 8, path: '/',
+    })
+    res.cookies.set('cl_session_token', sessionToken, {
+      httpOnly: true, secure: true, sameSite: 'lax', maxAge: 60 * 60 * 8, path: '/',
+    })
+    return res
   } catch (e) {
     console.error(e)
     return NextResponse.json({ error: 'Error interno' }, { status: 500 })
