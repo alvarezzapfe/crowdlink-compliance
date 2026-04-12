@@ -16,7 +16,7 @@ export default function KycGatePage() {
       accent: '#059669', accentLight: '#ECFDF5',
     },
     {
-      id: 'admin', href: '/login',
+      id: 'admin', href: '/kyc/admin',
       icon: <IconUser size={22} color="#0F7BF4" strokeWidth={1.8} />,
       label: 'Panel Admin',
       sublabel: 'Solo administradores',
