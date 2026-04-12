@@ -77,9 +77,9 @@ export default function KycAdminPage() {
       if (!profile) {
         const adminEmails = ['luis@crowdlink.mx', 'lalvarezzapfe@gmail.com']
         if (adminEmails.includes(user.email || '')) {
-          await supabase.from('profiles').upsert({ id: user.id, email: user.email, nombre: user.email?.split('@')[0], role: 'admin' })
+          window.location.href = '/gate'; return
         } else { window.location.href = '/kyc/wizard'; return }
-      } else if (profile.role !== 'admin') { window.location.href = '/kyc/wizard'; return }
+      } else if (!['admin', 'super_admin'].includes(profile.role)) { window.location.href = '/gate'; return }
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.access_token) setSessionToken(session.access_token)
       await loadEmpresas(session?.access_token)
@@ -226,7 +226,6 @@ export default function KycAdminPage() {
     inactivityTimer.current = setTimeout(async () => {
       const { createClient } = await import('@/lib/supabase-client')
       const supabase = createClient()
-      await supabase.auth.signOut()
       window.location.href = '/login'
     }, 30 * 60 * 1000)
   }, [])
