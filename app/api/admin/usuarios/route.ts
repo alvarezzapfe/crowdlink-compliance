@@ -26,13 +26,18 @@ export async function GET(req: NextRequest) {
   const userIds = users.map(u => u.id)
   const { data: profiles } = await supabaseAdmin.from('profiles').select('*').in('id', userIds)
 
+  const { data: totpRecords } = await supabaseAdmin
+    .from('admin_totp').select('user_id, verified').in('user_id', userIds)
+
   const result = users.map(u => {
     const profile = profiles?.find(p => p.id === u.id)
+    const totp = totpRecords?.find(t => t.user_id === u.id)
     return {
       id: u.id, email: u.email,
       nombre: profile?.nombre || null, apellidos: profile?.apellidos || null,
       role: profile?.role || 'readonly', activo: profile?.activo ?? false,
       last_login: u.last_sign_in_at, created_at: u.created_at,
+      totp_verified: totp?.verified ?? false,
     }
   })
 
