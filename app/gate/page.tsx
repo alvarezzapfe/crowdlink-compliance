@@ -1,8 +1,28 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import { cl } from '@/lib/design'
 import { IconShield, IconBuilding } from '@/components/Icons'
+
+const INACTIVITY_MS = 10 * 60 * 1000
+
+async function doLogout() {
+  const { createClient } = await import('@/lib/supabase-client')
+  const supabase = createClient()
+  await supabase.auth.signOut()
+  document.cookie = 'cl_2fa_verified=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+  window.location.href = '/login?reason=inactivity'
+}
+
+const INACTIVITY_MS = 10 * 60 * 1000
+
+async function doLogout() {
+  const { createClient } = await import('@/lib/supabase-client')
+  const supabase = createClient()
+  await supabase.auth.signOut()
+  document.cookie = 'cl_2fa_verified=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+  window.location.href = '/login?reason=inactivity'
+}
 
 
 function LogoutBtn() {
@@ -41,6 +61,22 @@ export default function GatePage() {
     }
     load()
   }, [])
+
+  // Hook inactividad 10 min
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const resetTimer = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => doLogout(), INACTIVITY_MS)
+  }, [])
+  useEffect(() => {
+    const events = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart']
+    events.forEach(e => window.addEventListener(e, resetTimer))
+    resetTimer()
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetTimer))
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [resetTimer])
 
   const modules = [
     {
