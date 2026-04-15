@@ -262,7 +262,7 @@ export async function POST(req: NextRequest) {
   const base64 = buffer.toString('base64')
 
   if (solo_descarga) {
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'Content-Disposition': `attachment; filename="NDA_${empresa.replace(/\s+/g, '_')}.docx"`,
