@@ -48,13 +48,8 @@ export default function RegisterPage({ params }: { params: { token: string } }) 
     const supabase = createClient()
     const { data: session } = await supabase.auth.signInWithPassword({ email: invite!.email, password })
     if (!session?.session) { setStep('done'); return }
-    const accessToken = session.session.access_token
-    const totpRes = await fetch('/api/v1/totp/setup', {
-      method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }
-    })
-    const totpData = await totpRes.json()
-    setTotpQr(totpData.qr_url); setTotpSecret(totpData.secret)
-    setStep('totp_setup')
+    // 2FA es opcional — el usuario lo configura después desde el hub
+    setStep('done')
   }
 
   async function handleTotpVerify() {
