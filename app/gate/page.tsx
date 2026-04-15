@@ -114,6 +114,19 @@ export default function GatePage() {
       accent: '#0891B2', accentLight: '#ECFEFF',
     },
     {
+      id: 'nda', href: '/nda', active: true,
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="M9 12l2 2 4-4"/>
+        </svg>
+      ),
+      label: 'NDAs',
+      desc: 'Genera y envía Convenios de Confidencialidad a contrapartes. Llena los campos, genera el Word y envía por email.',
+      tags: ['Word', 'Email', 'Resend', 'Machote'],
+      accent: '#0D9488', accentLight: '#F0FDFA',
+    },
+    {
       id: 'siti', href: '/siti', active: false,
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9333EA" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
