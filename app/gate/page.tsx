@@ -14,16 +14,6 @@ async function doLogout() {
   window.location.href = '/login?reason=inactivity'
 }
 
-const INACTIVITY_MS = 10 * 60 * 1000
-
-async function doLogout() {
-  const { createClient } = await import('@/lib/supabase-client')
-  const supabase = createClient()
-  await supabase.auth.signOut()
-  document.cookie = 'cl_2fa_verified=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
-  window.location.href = '/login?reason=inactivity'
-}
-
 
 function LogoutBtn() {
   async function handleLogout() {
