@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
       acta_constitutiva_url: body.acta_constitutiva_url || null,
       comprobante_domicilio_url: body.comprobante_domicilio_url || null,
       identificacion_rep_url: body.identificacion_rep_url || null,
+      monto_solicitado: body.monto_solicitado != null && Number(body.monto_solicitado) > 0 && Number(body.monto_solicitado) <= 999999999 ? Number(body.monto_solicitado) : null,
       status: 'pending',
       metadata: body.metadata || {},
     }

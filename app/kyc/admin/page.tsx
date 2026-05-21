@@ -3,18 +3,19 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import { cl, statusConfig } from '@/lib/design'
 import {
-  IconSearch, IconBuilding, IconUser, IconDoc, IconZap, IconCreditCard,
-  IconNote, IconHistory, IconCheck, IconX, IconClock, IconFilter, IconShield
+  IconSearch, IconBuilding, IconUser, IconDoc, IconCreditCard,
+  IconNote, IconHistory, IconCheck, IconX, IconClock
 } from '@/components/Icons'
 
 interface Empresa {
   id: string; razon_social: string; rfc: string; tipo_persona: string
   giro: string; pais: string; rep_legal_nombre: string; rep_legal_curp: string
   acta_constitutiva_url: string; comprobante_domicilio_url: string; identificacion_rep_url: string
+  monto_solicitado: number | null
   status: string; notas: string; metadata: Record<string, unknown>; created_at: string; updated_at?: string
 }
 interface HistEvent { status: string; fecha: string; nota: string }
-type Tab = 'datos' | 'docs' | 'ekatena' | 'notas' | 'historial'
+type Tab = 'datos' | 'docs' | 'notas' | 'historial'
 interface Invitation {
   id: string; token: string; email: string; nombre_empresa: string
   used: boolean; used_at: string | null; expires_at: string; created_at: string
@@ -461,7 +462,6 @@ export default function KycAdminPage() {
               {([
                 { id: 'datos', label: 'Datos', icon: <IconBuilding size={13} /> },
                 { id: 'docs', label: 'Docs', icon: <IconDoc size={13} /> },
-                { id: 'ekatena', label: 'Ekatena', icon: <IconZap size={13} /> },
                 { id: 'notas', label: 'Notas', icon: <IconNote size={13} /> },
                 { id: 'historial', label: 'Historial', icon: <IconHistory size={13} /> },
               ] as { id: Tab; label: string; icon: React.ReactNode }[]).map(tab => (
@@ -491,6 +491,7 @@ export default function KycAdminPage() {
                   {!!(selected?.metadata?.financiero) && (
                     <Section title="Perfil Financiero">
                       <DR l="Facturación" v={String((selected.metadata.financiero as Record<string,unknown>)?.nivel_facturacion || '—')} />
+                      <DR l="Monto solicitado" v={selected?.monto_solicitado ? `$${selected.monto_solicitado.toLocaleString('en-US')} MXN` : '—'} />
                       <DR l="Empleados" v={String((selected.metadata.financiero as Record<string,unknown>)?.num_empleados || '—')} />
                       <DR l="Fuente recursos" v={String((selected.metadata.financiero as Record<string,unknown>)?.fuente_recursos || '—')} />
                       <DR l="Opera en efectivo" v={(selected.metadata.financiero as Record<string,unknown>)?.opera_en_efectivo === 'si' ? 'Sí' : 'No'} />
@@ -534,25 +535,6 @@ export default function KycAdminPage() {
                       )}
                     </div>
                   ))}
-                </div>
-              )}
-
-              {activeTab === 'ekatena' && (
-                <div>
-                  <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '1.5rem', textAlign: 'center', marginBottom: '1rem' }}>
-                    <div style={{ fontSize: '2.5rem', fontWeight: '800', color: '#E2E8F0', letterSpacing: '-0.04em', marginBottom: '0.5rem' }}>—</div>
-                    <div style={{ color: '#94A3B8', fontSize: '0.82rem' }}>Score Ekatena</div>
-                  </div>
-                  {!!(selected?.metadata?.ekatena_conectado) ? (
-                    <div style={{ background: '#ECFDF5', border: '1px solid #6EE7B7', borderRadius: '8px', padding: '0.75rem 1rem', color: '#065F46', fontSize: '0.82rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <IconCheck size={15} color="#059669" /> Ekatena conectado
-                      {!!(selected?.metadata?.ekatena_rfc) && <span style={{ color: '#4B7A60', fontWeight: '400', fontSize: '0.75rem' }}>· RFC: {String(selected.metadata.ekatena_rfc)}</span>}
-                    </div>
-                  ) : (
-                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.82rem' }}>
-                      No conectado — score se solicitará manualmente
-                    </div>
-                  )}
                 </div>
               )}
 
