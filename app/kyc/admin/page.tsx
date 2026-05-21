@@ -517,7 +517,18 @@ export default function KycAdminPage() {
                         </div>
                       </div>
                       {doc.url ? (
-                        <a href={doc.url} target="_blank" rel="noreferrer" style={{ background: '#EBF3FF', border: '1px solid #BFDBFE', color: '#0F7BF4', fontSize: '0.75rem', fontWeight: '600', padding: '0.3rem 0.7rem', borderRadius: '6px', textDecoration: 'none' }}>Ver</a>
+                        <button onClick={async () => {
+                          const supabase = createClient()
+                          const { data: { session } } = await supabase.auth.getSession()
+                          const t = session?.access_token || sessionToken
+                          const res = await fetch('/api/v1/kyc/signed-url', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${t}` },
+                            body: JSON.stringify({ path: doc.url }),
+                          })
+                          const data = await res.json()
+                          if (data.url) window.open(data.url, '_blank')
+                        }} style={{ background: '#EBF3FF', border: '1px solid #BFDBFE', color: '#0F7BF4', fontSize: '0.75rem', fontWeight: '600', padding: '0.3rem 0.7rem', borderRadius: '6px', cursor: 'pointer', fontFamily: font }}>Ver</button>
                       ) : (
                         <span style={{ color: '#94A3B8', fontSize: '0.72rem' }}>—</span>
                       )}

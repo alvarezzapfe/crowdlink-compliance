@@ -3,6 +3,9 @@ import { validateApiKey } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 import { z } from 'zod'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 const EmpresaSchema = z.object({
   razon_social: z.string().min(2),
   rfc: z.string().regex(/^[A-Z&Ñ]{3,4}\d{6}[A-Z0-9]{3}$/, 'RFC inválido'),

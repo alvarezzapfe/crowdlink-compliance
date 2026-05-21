@@ -98,19 +98,20 @@ export default function KycWizardPage() {
     setStep(s => s + 1)
   }
 
-  // ─── Upload doc to Supabase Storage ────────────────────────────────────────
+  // ─── Upload doc via server-side endpoint ────────────────────────────────────
   const uploadDoc = async (key: keyof typeof docs, file: File) => {
     setDocs(d => ({ ...d, [key]: { ...d[key], file, uploading: true, error: '' } }))
     try {
-      const supabase = createClient()
-      const ext = file.name.split('.').pop()
-      const path = `kyc/${Date.now()}-${key}.${ext}`
-      const { error } = await supabase.storage.from('kyc-docs').upload(path, file, { upsert: true })
-      if (error) throw error
-      const { data: { publicUrl } } = supabase.storage.from('kyc-docs').getPublicUrl(path)
-      setDocs(d => ({ ...d, [key]: { file, url: publicUrl, uploading: false, error: '' } }))
+      const body = new FormData()
+      body.append('file', file)
+      body.append('tipo', key)
+      const res = await fetch('/api/v1/kyc/upload', { method: 'POST', body })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al subir')
+      // Guardar path (no URL pública)
+      setDocs(d => ({ ...d, [key]: { file, url: data.path, uploading: false, error: '' } }))
     } catch (e) {
-      setDocs(d => ({ ...d, [key]: { ...d[key], uploading: false, error: 'Error al subir. Intenta de nuevo.' } }))
+      setDocs(d => ({ ...d, [key]: { ...d[key], uploading: false, error: e instanceof Error ? e.message : 'Error al subir. Intenta de nuevo.' } }))
     }
   }
 

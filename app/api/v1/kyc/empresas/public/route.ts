@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // Endpoint público — permite submissions sin sesión autenticada
 // Usa service role para insertar en kyc_empresas
 const supabaseAdmin = createClient(

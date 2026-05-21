@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { isAdmin } from '@/lib/permissions'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,7 +18,7 @@ export async function GET(req: NextRequest) {
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
     if (userError || !user) return NextResponse.json({ error: 'No autorizado', detail: userError?.message }, { status: 401 })
     const { data: profile } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden', role: profile?.role }, { status: 403 })
+    if (!isAdmin(profile?.role)) return NextResponse.json({ error: 'Forbidden', role: profile?.role }, { status: 403 })
     const { data, error: dbError, count } = await supabaseAdmin
       .from('kyc_empresas')
       .select('*', { count: 'exact' })

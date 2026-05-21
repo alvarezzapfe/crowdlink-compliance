@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { isAdmin } from '@/lib/permissions'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
     if (error || !user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     const { data: profile } = await supabaseAdmin.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'admin') return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
+    if (!isAdmin(profile?.role)) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
     const body = await req.json()
     const { invitation_id, email, invite_url: directUrl, nombre_empresa: directNombre } = body

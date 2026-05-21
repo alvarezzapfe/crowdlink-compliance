@@ -53,3 +53,8 @@ export function canEdit(role: Role, modulo: Modulo): boolean {
 export function canView(role: Role, modulo: Modulo): boolean {
   return DEFAULT_PERMISSIONS[role]?.[modulo]?.ver ?? false
 }
+
+export function isAdmin(role: Role | string | null | undefined): boolean {
+  return role === 'super_admin' || role === 'admin'
+}
+

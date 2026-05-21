@@ -1,20 +1,12 @@
 'use client'
 import { useState } from 'react'
 import { cl } from '@/lib/design'
-import { IconUser, IconBuilding } from '@/components/Icons'
+import { IconUser } from '@/components/Icons'
 
 export default function KycGatePage() {
   const [hovered, setHovered] = useState<string | null>(null)
 
   const options = [
-    {
-      id: 'empresa', href: '/kyc/inicio',
-      icon: <IconBuilding size={22} color="#059669" strokeWidth={1.8} />,
-      label: 'KYC Empresas',
-      sublabel: 'Solicitantes',
-      desc: 'Completa el proceso de onboarding, información financiera, documentos y conexión Ekatena.',
-      accent: '#059669', accentLight: '#ECFDF5',
-    },
     {
       id: 'admin', href: '/kyc/admin',
       icon: <IconUser size={22} color="#0F7BF4" strokeWidth={1.8} />,
@@ -54,7 +46,7 @@ export default function KycGatePage() {
 
       {/* Cards */}
       <div style={{ flex: 1, padding: '2.5rem 2rem' }}>
-        <div style={{ maxWidth: '760px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+        <div style={{ maxWidth: '440px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem' }}>
           {options.map(o => (
             <a key={o.id} href={o.href} style={{ textDecoration: 'none' }}
               onMouseEnter={() => setHovered(o.id)} onMouseLeave={() => setHovered(null)}>
