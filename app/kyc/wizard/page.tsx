@@ -171,10 +171,7 @@ export default function KycWizardPage() {
           <p style={{ color: cl.gray500, fontSize: '0.88rem', lineHeight: 1.7, margin: '0 0 1rem' }}>
             Tu expediente fue recibido. El equipo de compliance lo revisará y recibirás una notificación.
           </p>
-          <div style={{ color: cl.gray400, fontSize: '0.73rem', fontFamily: 'monospace', marginBottom: '2rem' }}>ID: {submitted}</div>
-          <a href="/gate" style={{ background: '#0F7BF4', color: 'white', textDecoration: 'none', padding: '0.75rem 2rem', borderRadius: '10px', fontSize: '0.9rem', fontWeight: '700', display: 'inline-block' }}>
-            Volver al inicio
-          </a>
+          <div style={{ color: cl.gray400, fontSize: '0.73rem', fontFamily: 'monospace' }}>ID: {submitted}</div>
         </div>
       </div>
       <style>{fontImport}</style>
