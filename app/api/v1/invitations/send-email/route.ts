@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+        from: `CONTACTO CROWDLINK <${process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev'}>`,
         to: [inv_email],
         subject: `${nombre_empresa ? nombre_empresa + ' — ' : ''}Invitación KYC Crowdlink`,
         html: buildEmailHTML({ nombre_empresa, invite_url }),
@@ -78,12 +78,11 @@ function buildEmailHTML({ nombre_empresa, invite_url }: { nombre_empresa: string
       <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:20px;border:1px solid #E2E8F0;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
 
         <!-- HEADER -->
-        <tr><td style="background:linear-gradient(135deg,#0F7BF4 0%,#00C98A 100%);padding:32px 40px;">
+        <tr><td style="background:linear-gradient(135deg,#0F7BF4 0%,#00C98A 100%);padding:20px 40px;">
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td>
-                <img src="https://crowdlink-compliance.vercel.app/crowdlink-logo.png" alt="crowdlink" height="28" style="display:block;" />
-                <div style="font-size:12px;color:rgba(255,255,255,0.75);margin-top:6px;letter-spacing:0.05em;">COMPLIANCE HUB</div>
+                <div style="font-size:12px;color:rgba(255,255,255,0.85);letter-spacing:0.05em;font-weight:600;">COMPLIANCE HUB</div>
               </td>
               <td align="right">
                 <div style="background:rgba(255,255,255,0.2);border-radius:8px;padding:6px 12px;display:inline-block;">
@@ -94,8 +93,11 @@ function buildEmailHTML({ nombre_empresa, invite_url }: { nombre_empresa: string
           </table>
         </td></tr>
 
-        <!-- BODY -->
+        <!-- LOGO + BODY -->
         <tr><td style="padding:40px 40px 32px;">
+          <div style="text-align:center;margin-bottom:28px;">
+            <img src="https://crowdlink-compliance.vercel.app/crowdlink-logo.png" alt="crowdlink" height="32" style="display:inline-block;" />
+          </div>
           <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#0F172A;letter-spacing:-0.02em;">
             ${nombre_empresa ? nombre_empresa + ', completa' : 'Completa'} tu registro KYC
           </h1>

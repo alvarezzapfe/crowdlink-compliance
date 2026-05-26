@@ -31,11 +31,13 @@ function buildEmailHTML({ nombre_empresa, invite_url }: { nombre_empresa: string
   <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;border:1px solid #E2E8F0;overflow:hidden;">
-        <tr><td style="background:linear-gradient(135deg,#0F7BF4,#3DFFA0);padding:28px 32px;">
-          <div style="font-size:20px;font-weight:700;color:white;">crowdlink</div>
-          <div style="font-size:12px;color:rgba(255,255,255,0.8);margin-top:2px;">Compliance Hub</div>
+        <tr><td style="background:linear-gradient(135deg,#0F7BF4,#3DFFA0);padding:20px 32px;">
+          <div style="font-size:12px;color:rgba(255,255,255,0.85);letter-spacing:0.05em;font-weight:600;">COMPLIANCE HUB</div>
         </td></tr>
         <tr><td style="padding:36px 40px 28px;">
+          <div style="text-align:center;margin-bottom:24px;">
+            <img src="https://crowdlink-compliance.vercel.app/crowdlink-logo.png" alt="crowdlink" height="32" style="display:inline-block;" />
+          </div>
           <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#0F172A;">
             ${nombre_empresa ? nombre_empresa + ', completa' : 'Completa'} tu registro KYC
           </h1>
