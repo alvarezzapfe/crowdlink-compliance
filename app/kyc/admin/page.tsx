@@ -11,7 +11,7 @@ interface Empresa {
   id: string; razon_social: string; rfc: string; tipo_persona: string
   giro: string; pais: string; rep_legal_nombre: string; rep_legal_curp: string
   acta_constitutiva_url: string; comprobante_domicilio_url: string; identificacion_rep_url: string
-  monto_solicitado: number | null
+  monto_solicitado: number | null; plazo_meses: number | null; tipo_amortizacion: string | null
   status: string; notas: string; metadata: Record<string, unknown>; created_at: string; updated_at?: string
 }
 interface HistEvent { status: string; fecha: string; nota: string }
@@ -491,12 +491,16 @@ export default function KycAdminPage() {
                   {!!(selected?.metadata?.financiero) && (
                     <Section title="Perfil Financiero">
                       <DR l="Facturación" v={String((selected.metadata.financiero as Record<string,unknown>)?.nivel_facturacion || '—')} />
-                      <DR l="Monto solicitado" v={selected?.monto_solicitado ? `$${selected.monto_solicitado.toLocaleString('en-US')} MXN` : '—'} />
                       <DR l="Empleados" v={String((selected.metadata.financiero as Record<string,unknown>)?.num_empleados || '—')} />
                       <DR l="Fuente recursos" v={String((selected.metadata.financiero as Record<string,unknown>)?.fuente_recursos || '—')} />
                       <DR l="Opera en efectivo" v={(selected.metadata.financiero as Record<string,unknown>)?.opera_en_efectivo === 'si' ? 'Sí' : 'No'} />
                     </Section>
                   )}
+                  <Section title="Solicitud de Crédito">
+                    <DR l="Monto" v={selected?.monto_solicitado ? `$${selected.monto_solicitado.toLocaleString('en-US')} MXN` : '—'} />
+                    <DR l="Plazo" v={selected?.plazo_meses ? `${selected.plazo_meses} meses` : '—'} />
+                    <DR l="Amortización" v={selected?.tipo_amortizacion === 'lineal' ? 'Lineal' : selected?.tipo_amortizacion === 'bullet' ? 'Bullet' : '—'} />
+                  </Section>
                 </div>
               )}
 

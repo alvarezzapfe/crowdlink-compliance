@@ -33,6 +33,8 @@ export async function POST(req: NextRequest) {
       comprobante_domicilio_url: body.comprobante_domicilio_url || null,
       identificacion_rep_url: body.identificacion_rep_url || null,
       monto_solicitado: body.monto_solicitado != null && Number(body.monto_solicitado) > 0 && Number(body.monto_solicitado) <= 999999999 ? Number(body.monto_solicitado) : null,
+      plazo_meses: body.plazo_meses != null && Number(body.plazo_meses) > 0 && Number(body.plazo_meses) <= 999 ? Number(body.plazo_meses) : null,
+      tipo_amortizacion: ['lineal', 'bullet'].includes(body.tipo_amortizacion) ? body.tipo_amortizacion : null,
       status: 'pending',
       metadata: body.metadata || {},
     }

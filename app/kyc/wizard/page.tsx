@@ -2,7 +2,7 @@
 import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import { cl } from '@/lib/design'
-import { IconCheck, IconDoc, IconUser, IconBuilding, IconCreditCard, IconInfo, IconX } from '@/components/Icons'
+import { IconCheck, IconDoc, IconUser, IconBuilding, IconCreditCard, IconNote, IconInfo, IconX } from '@/components/Icons'
 import { sanitize, sanitizeRFC, sanitizeCURP, validateStep1, validateStep2, validateStep4 } from '@/lib/validation'
 
 const STEPS = [
@@ -10,7 +10,8 @@ const STEPS = [
   { n: 2, label: 'Rep. Legal', icon: <IconUser size={15} strokeWidth={1.8} /> },
   { n: 3, label: 'Financiero', icon: <IconCreditCard size={15} strokeWidth={1.8} /> },
   { n: 4, label: 'Documentos', icon: <IconDoc size={15} strokeWidth={1.8} /> },
-  { n: 5, label: 'Confirmar',  icon: <IconCheck size={15} strokeWidth={2} /> },
+  { n: 5, label: 'Solicitud',  icon: <IconNote size={15} strokeWidth={1.8} /> },
+  { n: 6, label: 'Confirmar',  icon: <IconCheck size={15} strokeWidth={2} /> },
 ]
 
 interface DocFile { file: File | null; url: string; uploading: boolean; error: string }
@@ -21,7 +22,8 @@ interface Form {
   rep_legal_nombre: string; rep_legal_curp: string
   nivel_facturacion: string; num_empleados: string; antiguedad: string
   fuente_recursos: string; pais_origen_recursos: string; opera_en_efectivo: string
-  monto_solicitado: string; giro_custom: string
+  monto_solicitado: string; plazo_meses: string; tipo_amortizacion: 'lineal' | 'bullet' | ''
+  giro_custom: string
 }
 
 const FACTURACION_OPTS = [
@@ -50,7 +52,8 @@ export default function KycWizardPage() {
     rep_legal_nombre: '', rep_legal_curp: '',
     nivel_facturacion: '', num_empleados: '', antiguedad: '',
     fuente_recursos: '', pais_origen_recursos: 'MX', opera_en_efectivo: 'no',
-    monto_solicitado: '', giro_custom: '',
+    monto_solicitado: '', plazo_meses: '', tipo_amortizacion: '',
+    giro_custom: '',
   })
   const [docs, setDocs] = useState({
     acta: emptyDoc(),
@@ -107,6 +110,7 @@ export default function KycWizardPage() {
       const supabase = createClient()
 
       const montoNum = form.monto_solicitado ? Number(form.monto_solicitado) : null
+      const plazoNum = form.plazo_meses && form.plazo_meses !== 'custom' ? Number(form.plazo_meses) : null
 
       const payload = {
         razon_social: form.razon_social,
@@ -120,6 +124,8 @@ export default function KycWizardPage() {
         comprobante_domicilio_url: docs.domicilio.url || null,
         identificacion_rep_url: docs.identificacion.url || null,
         monto_solicitado: montoNum,
+        plazo_meses: plazoNum,
+        tipo_amortizacion: form.tipo_amortizacion || null,
         status: 'pending',
         metadata: {
           financiero: {
@@ -137,20 +143,21 @@ export default function KycWizardPage() {
       const { data, error } = await supabase.from('kyc_empresas').insert(payload).select().single()
       if (error) throw error
       setSubmitted(data.id)
-      setStep(6)
+      setStep(7)
     } catch (e: unknown) {
       // Si falla por auth, enviar vía API pública
       try {
         const montoNum = form.monto_solicitado ? Number(form.monto_solicitado) : null
+        const plazoNum = form.plazo_meses && form.plazo_meses !== 'custom' ? Number(form.plazo_meses) : null
         const res = await fetch('/api/v1/kyc/empresas/public', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ razon_social: form.razon_social + (form.tipo_societario && form.tipo_societario !== 'Otro' ? ' ' + form.tipo_societario : ''), rfc: form.rfc, giro: form.giro === 'Otro' ? (form.giro_custom || 'Otro') : form.giro, tipo_persona: form.tipo_persona, pais: form.pais, rep_legal_nombre: form.rep_legal_nombre, rep_legal_curp: form.rep_legal_curp, acta_constitutiva_url: docs.acta.url || null, comprobante_domicilio_url: docs.domicilio.url || null, identificacion_rep_url: docs.identificacion.url || null, monto_solicitado: montoNum, status: 'pending', metadata: { financiero: { nivel_facturacion: form.nivel_facturacion, num_empleados: form.num_empleados, antiguedad: form.antiguedad, fuente_recursos: form.fuente_recursos, pais_origen_recursos: form.pais_origen_recursos, opera_en_efectivo: form.opera_en_efectivo } } }),
+          body: JSON.stringify({ razon_social: form.razon_social + (form.tipo_societario && form.tipo_societario !== 'Otro' ? ' ' + form.tipo_societario : ''), rfc: form.rfc, giro: form.giro === 'Otro' ? (form.giro_custom || 'Otro') : form.giro, tipo_persona: form.tipo_persona, pais: form.pais, rep_legal_nombre: form.rep_legal_nombre, rep_legal_curp: form.rep_legal_curp, acta_constitutiva_url: docs.acta.url || null, comprobante_domicilio_url: docs.domicilio.url || null, identificacion_rep_url: docs.identificacion.url || null, monto_solicitado: montoNum, plazo_meses: plazoNum, tipo_amortizacion: form.tipo_amortizacion || null, status: 'pending', metadata: { financiero: { nivel_facturacion: form.nivel_facturacion, num_empleados: form.num_empleados, antiguedad: form.antiguedad, fuente_recursos: form.fuente_recursos, pais_origen_recursos: form.pais_origen_recursos, opera_en_efectivo: form.opera_en_efectivo } } }),
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Error')
         setSubmitted(data.id)
-        setStep(6)
+        setStep(7)
       } catch (e2: unknown) {
         setSubmitError(e2 instanceof Error ? e2.message : 'Error al enviar')
       }
@@ -159,7 +166,7 @@ export default function KycWizardPage() {
   }
 
   // ─── Success ────────────────────────────────────────────────────────────────
-  if (step === 6) return (
+  if (step === 7) return (
     <div style={rootStyle}>
       <TopBar back="/kyc/inicio" title="Onboarding" minimal />
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
@@ -219,10 +226,10 @@ export default function KycWizardPage() {
           <div style={{ padding: '1rem 1.5rem 0', flexShrink: 0 }}>
             <div style={{ color: cl.gray400, fontSize: '0.65rem', fontWeight: '700', letterSpacing: '0.08em', marginBottom: '0.1rem' }}>PASO {step} DE {STEPS.length}</div>
             <h2 style={{ color: cl.gray900, fontSize: '1rem', fontWeight: '800', margin: '0 0 0.1rem', letterSpacing: '-0.01em' }}>
-              {['', 'Datos de la Empresa', 'Representante Legal', 'Perfil Financiero', 'Documentos', 'Confirmar y Enviar'][step]}
+              {['', 'Datos de la Empresa', 'Representante Legal', 'Perfil Financiero', 'Documentos', 'Solicitud de Crédito', 'Confirmar y Enviar'][step]}
             </h2>
             <p style={{ color: cl.gray400, fontSize: '0.76rem', margin: '0 0 0.65rem' }}>
-              {['', 'Información fiscal y comercial', 'Persona autorizada para obligar a la empresa', 'Nivel de riesgo y fuente de recursos', 'Sube los documentos del expediente', 'Revisa antes de enviar'][step]}
+              {['', 'Información fiscal y comercial', 'Persona autorizada para obligar a la empresa', 'Nivel de riesgo y fuente de recursos', 'Sube los documentos del expediente', 'Monto, plazo y tipo de amortización', 'Revisa antes de enviar'][step]}
             </p>
             <div style={{ height: '1px', background: cl.gray100 }} />
           </div>
@@ -383,23 +390,6 @@ export default function KycWizardPage() {
                     ))}
                   </div>
                 </div>
-                <div style={{ gridColumn: '1/-1' }}>
-                  <FL>Monto de crédito solicitado</FL>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      placeholder="$0 MXN"
-                      value={form.monto_solicitado ? `$${Number(form.monto_solicitado).toLocaleString('en-US')} MXN` : ''}
-                      onChange={e => {
-                        const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 9)
-                        setForm(p => ({ ...p, monto_solicitado: digits }))
-                        if (errors.monto_solicitado) setErrors(p => { const n = { ...p }; delete n.monto_solicitado; return n })
-                      }}
-                      inputMode="numeric"
-                      style={{ ...inputBase, borderColor: errors.monto_solicitado ? '#FCA5A5' : undefined }}
-                    />
-                  </div>
-                  {errors.monto_solicitado && <div style={{ color: '#DC2626', fontSize: '0.72rem', marginTop: '0.25rem' }}>{errors.monto_solicitado}</div>}
-                </div>
               </div>
             )}
 
@@ -423,8 +413,82 @@ export default function KycWizardPage() {
               </div>
             )}
 
-            {/* ── STEP 5: Confirmar ── */}
+            {/* ── STEP 5: Solicitud de crédito ── */}
             {step === 5 && (
+              <div style={{ display: 'grid', gap: '0.9rem' }}>
+                {/* Monto */}
+                <div>
+                  <FL>Monto solicitado *</FL>
+                  <input
+                    placeholder="$0 MXN"
+                    value={form.monto_solicitado ? `$${Number(form.monto_solicitado).toLocaleString('en-US')} MXN` : ''}
+                    onChange={e => {
+                      const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 9)
+                      setForm(p => ({ ...p, monto_solicitado: digits }))
+                      if (errors.monto_solicitado) setErrors(p => { const n = { ...p }; delete n.monto_solicitado; return n })
+                    }}
+                    inputMode="numeric"
+                    style={{ ...inputBase, borderColor: errors.monto_solicitado ? '#FCA5A5' : undefined }}
+                  />
+                  {errors.monto_solicitado && <div style={{ color: '#DC2626', fontSize: '0.72rem', marginTop: '0.25rem' }}>{errors.monto_solicitado}</div>}
+                </div>
+
+                {/* Plazo */}
+                <div>
+                  <FL>Plazo (meses)</FL>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.35rem' }}>
+                    {['12', '24', '36', '48', '60'].map(m => (
+                      <button key={m} onClick={() => {
+                        setForm(p => ({ ...p, plazo_meses: p.plazo_meses === m ? '' : m }))
+                        if (errors.plazo_meses) setErrors(p => { const n = { ...p }; delete n.plazo_meses; return n })
+                      }} style={{ padding: '0.55rem 0.3rem', borderRadius: '8px', cursor: 'pointer', textAlign: 'center', border: form.plazo_meses === m ? '2px solid #0F7BF4' : `1.5px solid ${cl.gray200}`, background: form.plazo_meses === m ? '#EBF3FF' : cl.white, color: form.plazo_meses === m ? '#0F7BF4' : cl.gray600, fontSize: '0.8rem', fontWeight: form.plazo_meses === m ? '700' : '400', fontFamily: cl.fontFamily }}>
+                        {m}
+                      </button>
+                    ))}
+                    <button onClick={() => {
+                      setForm(p => ({ ...p, plazo_meses: !['12','24','36','48','60',''].includes(p.plazo_meses) ? '' : 'custom' }))
+                    }} style={{ padding: '0.55rem 0.3rem', borderRadius: '8px', cursor: 'pointer', textAlign: 'center', border: !['12','24','36','48','60',''].includes(form.plazo_meses) ? '2px solid #0F7BF4' : `1.5px solid ${cl.gray200}`, background: !['12','24','36','48','60',''].includes(form.plazo_meses) ? '#EBF3FF' : cl.white, color: !['12','24','36','48','60',''].includes(form.plazo_meses) ? '#0F7BF4' : cl.gray600, fontSize: '0.8rem', fontWeight: !['12','24','36','48','60',''].includes(form.plazo_meses) ? '700' : '400', fontFamily: cl.fontFamily }}>
+                      Otro
+                    </button>
+                  </div>
+                  {!['12','24','36','48','60',''].includes(form.plazo_meses) && (
+                    <div style={{ marginTop: '0.4rem' }}>
+                      <input
+                        placeholder="Número de meses"
+                        value={form.plazo_meses === 'custom' ? '' : form.plazo_meses}
+                        onChange={e => {
+                          const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 3)
+                          setForm(p => ({ ...p, plazo_meses: digits || 'custom' }))
+                        }}
+                        inputMode="numeric"
+                        autoFocus
+                        style={inputBase}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Tipo de amortización */}
+                <div>
+                  <FL>Tipo de amortización</FL>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                    {([
+                      { v: 'lineal' as const, label: 'Lineal', desc: 'Pagos iguales periódicos de capital e interés' },
+                      { v: 'bullet' as const, label: 'Bullet', desc: 'Intereses periódicos, capital al vencimiento' },
+                    ]).map(o => (
+                      <button key={o.v} onClick={() => setForm(p => ({ ...p, tipo_amortizacion: p.tipo_amortizacion === o.v ? '' : o.v }))}
+                        style={{ padding: '0.85rem', borderRadius: '10px', cursor: 'pointer', textAlign: 'left', border: form.tipo_amortizacion === o.v ? '2px solid #0F7BF4' : `1.5px solid ${cl.gray200}`, background: form.tipo_amortizacion === o.v ? '#EBF3FF' : cl.white, fontFamily: cl.fontFamily }}>
+                        <div style={{ color: form.tipo_amortizacion === o.v ? '#0F7BF4' : cl.gray800, fontSize: '0.88rem', fontWeight: '700', marginBottom: '0.25rem' }}>{o.label}</div>
+                        <div style={{ color: form.tipo_amortizacion === o.v ? '#3B82F6' : cl.gray400, fontSize: '0.72rem', lineHeight: 1.4 }}>{o.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── STEP 6: Confirmar ── */}
+            {step === 6 && (
               <div>
                 {/* Header visual */}
                 <div style={{ textAlign: 'center', marginBottom: '1.5rem', paddingTop: '0.5rem' }}>
@@ -449,8 +513,12 @@ export default function KycWizardPage() {
                     ]},
                     { group: 'FINANCIERO', rows: [
                       { l: 'Facturación', v: FACTURACION_OPTS.find(o => o.v === form.nivel_facturacion)?.l || '—' },
-                      { l: 'Monto solicitado', v: form.monto_solicitado ? `$${Number(form.monto_solicitado).toLocaleString('en-US')} MXN` : '—' },
                       { l: 'Opera en efectivo', v: form.opera_en_efectivo === 'si' ? 'Sí' : 'No' },
+                    ]},
+                    { group: 'SOLICITUD', rows: [
+                      { l: 'Monto', v: form.monto_solicitado ? `$${Number(form.monto_solicitado).toLocaleString('en-US')} MXN` : '—' },
+                      { l: 'Plazo', v: form.plazo_meses && form.plazo_meses !== 'custom' ? `${form.plazo_meses} meses` : '—' },
+                      { l: 'Amortización', v: form.tipo_amortizacion === 'lineal' ? 'Lineal' : form.tipo_amortizacion === 'bullet' ? 'Bullet' : '—' },
                     ]},
                     { group: 'DOCUMENTOS', rows: [
                       { l: 'Acta Constitutiva', v: docs.acta.url ? 'Subido' : 'Pendiente' },
