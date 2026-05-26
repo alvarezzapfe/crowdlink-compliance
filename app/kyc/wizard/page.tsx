@@ -178,7 +178,8 @@ export default function KycWizardPage() {
           <p style={{ color: cl.gray500, fontSize: '0.88rem', lineHeight: 1.7, margin: '0 0 1rem' }}>
             Tu expediente fue recibido. El equipo de compliance lo revisará y recibirás una notificación.
           </p>
-          <div style={{ color: cl.gray400, fontSize: '0.73rem', fontFamily: 'monospace' }}>ID: {submitted}</div>
+          <div style={{ color: cl.gray400, fontSize: '0.73rem', fontFamily: 'monospace', marginBottom: '1rem' }}>ID: {submitted}</div>
+          <p style={{ color: cl.gray300, fontSize: '0.78rem', margin: 0 }}>Ya puedes cerrar esta ventana de forma segura.</p>
         </div>
       </div>
       <style>{fontImport}</style>
