@@ -4,7 +4,7 @@ import { createServerClient } from '@supabase/ssr'
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  const PUBLIC_ROUTES = ['/', '/login', '/faq', '/reset-password']
+  const PUBLIC_ROUTES = ['/', '/login', '/faq', '/reset-password', '/simulador']
   const PUBLIC_PREFIXES = ['/auth/', '/invite/', '/api/', '/contratos/fill/', '/register/', '/kyc', '/pld/login']
 
   const isPublic =
