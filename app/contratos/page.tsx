@@ -147,7 +147,6 @@ export default function ContratosPage() {
         {view === 'nueva_instancia' && <NuevaInstancia templates={templates} onDone={(inst) => { loadData(); if (inst?.modo === 'wizard_interno') { setActiveInstancia(inst); setView('wizard') } else setView('dashboard') }} />}
         {view === 'wizard' && activeInstancia && <WizardContratos instancia={activeInstancia} onDone={() => { loadData(); setView('dashboard') }} />}
       </div>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');`}</style>
     </div>
   )
 }
