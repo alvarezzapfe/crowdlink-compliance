@@ -36,7 +36,7 @@ interface Instrumento {
   label: string
   tasa: number
   color: string
-  riesgo: 'MINIMO' | 'BAJO' | 'ALTO'
+  riesgo: 'MINIMO' | 'BAJO' | 'MODERADO' | 'ALTO'
   riesgoLabel: string
   riesgoNota: string
   visible: boolean
@@ -67,7 +67,7 @@ interface ResultadoFinal {
 const INSTRUMENTOS_DEFAULT: Instrumento[] = [
   {
     key: 'crowdlink', label: 'Credito Crowdlink', tasa: 15.0,
-    color: '#1478FB', riesgo: 'ALTO', riesgoLabel: 'Alto',
+    color: '#1478FB', riesgo: 'MODERADO', riesgoLabel: 'Moderado',
     riesgoNota: 'No cubierto por IPAB. Riesgo de impago del acreditado.',
     visible: true, isrTipo: 'deuda',
   },
@@ -225,33 +225,13 @@ export default function SimuladorInversiones() {
   const delta = mejor && segundo ? mejor.neto - segundo.neto : 0
 
   const riesgoColor = (r: string) =>
-    r === 'MINIMO' ? B.mint : r === 'BAJO' ? '#D97706' : '#EF4444'
+    r === 'MINIMO' ? B.mint : r === 'BAJO' ? '#D97706' : r === 'MODERADO' ? '#D97706' : '#EF4444'
 
   const riesgoBg = (r: string) =>
-    r === 'MINIMO' ? B.mintLight : r === 'BAJO' ? '#FFF8EB' : '#FEF2F2'
+    r === 'MINIMO' ? B.mintLight : r === 'BAJO' ? '#FFF8EB' : r === 'MODERADO' ? '#FFF8EB' : '#FEF2F2'
 
   return (
     <div style={{ width: '100%', maxWidth: '960px', margin: '0 auto' }}>
-      <style>{`
-        @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-        .sim-input{transition:border-color 0.15s}
-        .sim-input:focus{border-color:${B.blue}!important;outline:none;box-shadow:0 0 0 3px rgba(20,120,251,0.1)}
-        .sim-slider{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;background:${B.border};outline:none}
-        .sim-slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:${B.blue};cursor:pointer;border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.15)}
-        .sim-slider::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:${B.blue};cursor:pointer;border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.15)}
-        .sim-slider:focus-visible{box-shadow:0 0 0 3px rgba(20,120,251,0.2)}
-        .sim-toggle{position:relative;width:44px;height:24px;border-radius:12px;cursor:pointer;border:none;transition:background 0.2s;flex-shrink:0}
-        .sim-toggle::after{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:white;transition:transform 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.15)}
-        .sim-toggle[data-on="true"]{background:${B.blue}}
-        .sim-toggle[data-on="true"]::after{transform:translateX(20px)}
-        .sim-toggle[data-on="false"]{background:${B.border}}
-        .sim-toggle:focus-visible{outline:2px solid ${B.blue};outline-offset:2px}
-        .result-row{transition:background 0.15s}
-        .result-row:hover{background:${B.bgOff}!important}
-        .inst-card{transition:all 0.15s}
-        .inst-card:hover{box-shadow:${B.shadowMd}}
-      `}</style>
-
       {/* ── Header ──────────────────────────────────────── */}
       <div style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
