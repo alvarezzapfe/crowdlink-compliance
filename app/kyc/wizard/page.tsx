@@ -663,4 +663,4 @@ const rootStyle: React.CSSProperties = { height: '100vh', background: cl.gray50,
 const inputBase: React.CSSProperties = { width: '100%', background: cl.white, border: `1.5px solid ${cl.gray200}`, borderRadius: '9px', padding: '0.55rem 0.85rem', color: cl.gray800, fontSize: '0.84rem', fontFamily: cl.fontFamily, outline: 'none', boxSizing: 'border-box' as const }
 const btnPrimary: React.CSSProperties = { background: '#0F7BF4', color: 'white', border: 'none', borderRadius: '9px', padding: '0.65rem 1.5rem', fontSize: '0.85rem', fontWeight: '700', cursor: 'pointer', fontFamily: cl.fontFamily, display: 'flex', alignItems: 'center', gap: '0.4rem', boxShadow: '0 4px 12px rgba(15,123,244,0.2)' }
 const btnGhost: React.CSSProperties = { background: cl.gray100, border: `1px solid ${cl.gray200}`, borderRadius: '9px', padding: '0.65rem 1.25rem', color: cl.gray600, cursor: 'pointer', fontSize: '0.82rem', fontWeight: '500', fontFamily: cl.fontFamily }
-const fontImport = `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');`
+const fontImport = ''

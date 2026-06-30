@@ -124,7 +124,7 @@ export default function ResetPasswordPage() {
           </div>
         </div>
       </div>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap'); input:focus{border-color:#0F7BF4!important;box-shadow:0 0 0 3px #EBF3FF;outline:none;} @keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <style>{`input:focus{border-color:#0F7BF4!important;box-shadow:0 0 0 3px #EBF3FF;outline:none;} @keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 }

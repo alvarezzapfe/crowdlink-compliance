@@ -76,7 +76,7 @@ export default function RegisterPage({ params }: { params: { token: string } }) 
         <div style={{ width:'40px', height:'40px', border:'3px solid #E2E8F0', borderTopColor:'#1E6FF1', borderRadius:'50%', margin:'0 auto 1rem', animation:'spin 0.8s linear infinite' }} />
         <p style={{ color:'#94A3B8', fontSize:'0.875rem' }}>Verificando invitación…</p>
       </div>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');`}</style>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 
@@ -87,7 +87,6 @@ export default function RegisterPage({ params }: { params: { token: string } }) 
         <h1 style={{ color:'#0F172A', fontSize:'1.3rem', fontWeight:'700', margin:'0 0 0.75rem' }}>Invitación inválida</h1>
         <p style={{ color:'#64748B', fontSize:'0.875rem', margin:0 }}>{errorMsg}</p>
       </div>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');`}</style>
     </div>
   )
 
@@ -105,7 +104,6 @@ export default function RegisterPage({ params }: { params: { token: string } }) 
           <p style={{ color:'#065F46', fontSize:'0.78rem', margin:0 }}>Dudas: <strong>contacto@crowdlink.mx</strong></p>
         </div>
       </div>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');`}</style>
     </div>
   )
 
@@ -194,7 +192,7 @@ export default function RegisterPage({ params }: { params: { token: string } }) 
           )}
         </div>
       </div>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap'); *{box-sizing:border-box}`}</style>
+      <style>{`*{box-sizing:border-box}`}</style>
     </div>
   )
 }

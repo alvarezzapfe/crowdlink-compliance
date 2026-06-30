@@ -146,7 +146,6 @@ export default function PldLoginPage() {
         </div>
       </div>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         input:focus { border-color: #059669 !important; box-shadow: 0 0 0 3px #ECFDF5; outline: none; }
       `}</style>
     </div>

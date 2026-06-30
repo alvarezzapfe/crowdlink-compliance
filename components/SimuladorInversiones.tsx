@@ -5,6 +5,29 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import type { TasasResponse } from '@/app/api/tasas/route'
+import { IconStar, IconTrendingUp, IconGlobe } from '@/components/Icons'
+
+/* ─── Brand tokens (light) ───────────────────────────────────── */
+
+const B = {
+  blue: '#1478FB',
+  mint: '#28C89C',
+  mintDark: '#1FA882',
+  mintLight: '#EDFAF5',
+  ink: '#0A1628',
+  textSoft: '#5B6B7F',
+  textMuted: '#8D99A8',
+  bg: '#FFFFFF',
+  bgOff: '#F6F9FC',
+  border: '#E6EBF1',
+  borderLight: '#F0F3F7',
+  shadow: '0 1px 3px rgba(10,22,40,0.06), 0 1px 2px rgba(10,22,40,0.04)',
+  shadowMd: '0 4px 12px rgba(10,22,40,0.07), 0 1px 3px rgba(10,22,40,0.04)',
+  shadowLg: '0 12px 32px rgba(10,22,40,0.08), 0 4px 8px rgba(10,22,40,0.04)',
+  fontDisplay: "'DM Sans', -apple-system, sans-serif",
+  fontBody: "'Inter', -apple-system, sans-serif",
+  fontMono: "'JetBrains Mono', 'Fira Code', monospace",
+}
 
 /* ─── Types ──────────────────────────────────────────────────── */
 
@@ -13,14 +36,15 @@ interface Instrumento {
   label: string
   tasa: number
   color: string
-  riesgo: 'MÍNIMO' | 'BAJO' | 'ALTO'
+  riesgo: 'MINIMO' | 'BAJO' | 'ALTO'
+  riesgoLabel: string
   riesgoNota: string
   visible: boolean
   isrTipo: 'deuda' | 'capital'
 }
 
 interface PuntoAnual {
-  año: number
+  year: number
   [key: string]: number
 }
 
@@ -32,34 +56,36 @@ interface ResultadoFinal {
   neto: number
   ganancia: number
   riesgo: string
+  riesgoLabel: string
   riesgoNota: string
   color: string
+  tasa: number
 }
 
 /* ─── Defaults ───────────────────────────────────────────────── */
 
 const INSTRUMENTOS_DEFAULT: Instrumento[] = [
   {
-    key: 'crowdlink', label: 'Crédito Crowdlink', tasa: 15.0,
-    color: '#3EE8A0', riesgo: 'ALTO',
+    key: 'crowdlink', label: 'Credito Crowdlink', tasa: 15.0,
+    color: '#1478FB', riesgo: 'ALTO', riesgoLabel: 'Alto',
     riesgoNota: 'No cubierto por IPAB. Riesgo de impago del acreditado.',
     visible: true, isrTipo: 'deuda',
   },
   {
     key: 'sp500', label: 'S&P 500', tasa: 10.0,
-    color: '#0891B2', riesgo: 'ALTO',
+    color: '#28C89C', riesgo: 'ALTO', riesgoLabel: 'Alto',
     riesgoNota: 'Renta variable en USD. Volatilidad + riesgo cambiario MXN/USD.',
     visible: true, isrTipo: 'capital',
   },
   {
     key: 'cetes', label: 'CETES 364d', tasa: 7.17,
-    color: '#7C3AED', riesgo: 'MÍNIMO',
-    riesgoNota: 'Respaldo del Gobierno Federal. Prácticamente libre de riesgo.',
+    color: '#7C3AED', riesgo: 'MINIMO', riesgoLabel: 'Minimo',
+    riesgoNota: 'Respaldo del Gobierno Federal. Practicamente libre de riesgo.',
     visible: true, isrTipo: 'deuda',
   },
   {
-    key: 'pagare', label: 'Pagaré bancario', tasa: 6.5,
-    color: '#D97706', riesgo: 'BAJO',
+    key: 'pagare', label: 'Pagare bancario', tasa: 6.5,
+    color: '#D97706', riesgo: 'BAJO', riesgoLabel: 'Bajo',
     riesgoNota: 'Protegido por IPAB hasta 400,000 UDIs (~$3.2M MXN).',
     visible: true, isrTipo: 'deuda',
   },
@@ -75,13 +101,13 @@ const formatPct = (n: number) => `${n.toFixed(2)}%`
 function simular(
   montoInicial: number,
   aportMensual: number,
-  años: number,
+  anios: number,
   tasaAnual: number,
   isrTipo: 'deuda' | 'capital',
   descontarISR: boolean,
 ): { serieAnual: number[]; bruto: number; isr: number; neto: number } {
   const rMensual = Math.pow(1 + tasaAnual / 100, 1 / 12) - 1
-  const meses = años * 12
+  const meses = anios * 12
   const serieAnual: number[] = [montoInicial]
   let saldo = montoInicial
   let isrAcumulado = 0
@@ -93,7 +119,6 @@ function simular(
     saldo = saldo * (1 + rMensual) + aportMensual
     if (m % 12 === 0) serieAnual.push(saldo)
   }
-  // If we didn't end on a year boundary, push final
   if (meses % 12 !== 0) serieAnual.push(saldo)
 
   const bruto = saldo
@@ -102,25 +127,28 @@ function simular(
     if (isrTipo === 'deuda') {
       isr = isrAcumulado
     } else {
-      // capital: 10% sobre ganancia total
       const ganancia = bruto - montoInicial - aportMensual * meses
       isr = ganancia > 0 ? 0.10 * ganancia : 0
     }
   }
-  const neto = bruto - isr
 
-  return { serieAnual, bruto, isr, neto }
+  return { serieAnual, bruto, isr, neto: bruto - isr }
 }
 
 /* ─── Component ──────────────────────────────────────────────── */
 
 export default function SimuladorInversiones() {
+  const [mounted, setMounted] = useState(false)
   const [montoInicial, setMontoInicial] = useState(100000)
   const [aportMensual, setAportMensual] = useState(0)
-  const [años, setAños] = useState(5)
+  const [anios, setAnios] = useState(5)
   const [descontarISR, setDescontarISR] = useState(true)
+  const [ajustarFX, setAjustarFX] = useState(false)
+  const [deprecAnual, setDeprecAnual] = useState(4)
   const [instrumentos, setInstrumentos] = useState<Instrumento[]>(INSTRUMENTOS_DEFAULT)
   const [tasasLive, setTasasLive] = useState(false)
+
+  useEffect(() => { setMounted(true) }, [])
 
   // Fetch live rates
   useEffect(() => {
@@ -152,21 +180,27 @@ export default function SimuladorInversiones() {
     const results: ResultadoFinal[] = []
     const dataPoints: PuntoAnual[] = []
 
-    // Init data points array
-    for (let y = 0; y <= años; y++) {
-      dataPoints.push({ año: y })
+    for (let y = 0; y <= anios; y++) {
+      dataPoints.push({ year: y })
     }
 
     for (const inst of instrumentos) {
-      const sim = simular(montoInicial, aportMensual, años, inst.tasa, inst.isrTipo, descontarISR)
+      // Adjust S&P 500 rate for FX if toggle is on
+      let tasaEfectiva = inst.tasa
+      if (inst.key === 'sp500' && ajustarFX) {
+        // Convert USD return to MXN: (1 + USD_return)(1 + MXN_depreciation) - 1
+        tasaEfectiva = ((1 + inst.tasa / 100) * (1 + deprecAnual / 100) - 1) * 100
+      }
 
-      for (let y = 0; y <= años; y++) {
+      const sim = simular(montoInicial, aportMensual, anios, tasaEfectiva, inst.isrTipo, descontarISR)
+
+      for (let y = 0; y <= anios; y++) {
         if (sim.serieAnual[y] !== undefined) {
           dataPoints[y][inst.key] = Math.round(sim.serieAnual[y])
         }
       }
 
-      const totalAportado = montoInicial + aportMensual * años * 12
+      const totalAportado = montoInicial + aportMensual * anios * 12
       results.push({
         key: inst.key,
         label: inst.label,
@@ -175,74 +209,158 @@ export default function SimuladorInversiones() {
         neto: sim.neto,
         ganancia: sim.neto - totalAportado,
         riesgo: inst.riesgo,
+        riesgoLabel: inst.riesgoLabel,
         riesgoNota: inst.riesgoNota,
         color: inst.color,
+        tasa: inst.key === 'sp500' && ajustarFX ? tasaEfectiva : inst.tasa,
       })
     }
 
     results.sort((a, b) => b.neto - a.neto)
-
     return { chartData: dataPoints, resultados: results }
-  }, [montoInicial, aportMensual, años, descontarISR, instrumentos])
+  }, [montoInicial, aportMensual, anios, descontarISR, instrumentos, ajustarFX, deprecAnual])
 
-  const mejorResultado = resultados[0]
+  const mejor = resultados[0]
+  const segundo = resultados[1]
+  const delta = mejor && segundo ? mejor.neto - segundo.neto : 0
 
   const riesgoColor = (r: string) =>
-    r === 'MÍNIMO' ? '#3EE8A0' : r === 'BAJO' ? '#D97706' : '#FF4444'
+    r === 'MINIMO' ? B.mint : r === 'BAJO' ? '#D97706' : '#EF4444'
+
+  const riesgoBg = (r: string) =>
+    r === 'MINIMO' ? B.mintLight : r === 'BAJO' ? '#FFF8EB' : '#FEF2F2'
 
   return (
-    <div style={s.wrapper}>
+    <div style={{ width: '100%', maxWidth: '960px', margin: '0 auto' }}>
       <style>{`
-        @media (prefers-reduced-motion: reduce) {
-          * { animation: none !important; transition: none !important; }
-        }
-        .sim-input:focus { border-color: #3EE8A0 !important; outline: none; }
-        .sim-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); outline: none; }
-        .sim-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #3EE8A0; cursor: pointer; border: 2px solid #050A14; }
-        .sim-slider::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: #3EE8A0; cursor: pointer; border: 2px solid #050A14; }
-        .sim-slider:focus { box-shadow: 0 0 0 3px rgba(62,232,160,0.3); }
-        .sim-toggle { position: relative; width: 40px; height: 22px; border-radius: 11px; cursor: pointer; border: none; transition: background 0.2s; }
-        .sim-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: white; transition: transform 0.2s; }
-        .sim-toggle[data-on="true"] { background: #3EE8A0; }
-        .sim-toggle[data-on="true"]::after { transform: translateX(18px); }
-        .sim-toggle[data-on="false"] { background: rgba(255,255,255,0.15); }
-        .winner-card { animation: glowPulse 3s ease-in-out infinite; }
-        @keyframes glowPulse { 0%,100% { box-shadow: 0 0 20px rgba(62,232,160,0.1); } 50% { box-shadow: 0 0 30px rgba(62,232,160,0.2); } }
-        .result-row { transition: background 0.15s; }
-        .result-row:hover { background: rgba(255,255,255,0.03) !important; }
+        @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+        .sim-input{transition:border-color 0.15s}
+        .sim-input:focus{border-color:${B.blue}!important;outline:none;box-shadow:0 0 0 3px rgba(20,120,251,0.1)}
+        .sim-slider{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;background:${B.border};outline:none}
+        .sim-slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:${B.blue};cursor:pointer;border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.15)}
+        .sim-slider::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:${B.blue};cursor:pointer;border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.15)}
+        .sim-slider:focus-visible{box-shadow:0 0 0 3px rgba(20,120,251,0.2)}
+        .sim-toggle{position:relative;width:44px;height:24px;border-radius:12px;cursor:pointer;border:none;transition:background 0.2s;flex-shrink:0}
+        .sim-toggle::after{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:white;transition:transform 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.15)}
+        .sim-toggle[data-on="true"]{background:${B.blue}}
+        .sim-toggle[data-on="true"]::after{transform:translateX(20px)}
+        .sim-toggle[data-on="false"]{background:${B.border}}
+        .sim-toggle:focus-visible{outline:2px solid ${B.blue};outline-offset:2px}
+        .result-row{transition:background 0.15s}
+        .result-row:hover{background:${B.bgOff}!important}
+        .inst-card{transition:all 0.15s}
+        .inst-card:hover{box-shadow:${B.shadowMd}}
       `}</style>
 
-      {/* Header */}
-      <div style={s.header}>
+      {/* ── Header ──────────────────────────────────────── */}
+      <div style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3EE8A0' }} />
-          <span style={s.tag}>SIMULADOR DE INVERSIONES</span>
-        </div>
-        <h2 style={s.title}>Compara tu rendimiento</h2>
-        <p style={s.subtitle}>
-          Simula cómo crecería tu inversión en diferentes instrumentos financieros.
+          <IconTrendingUp size={16} color={B.mint} strokeWidth={2} />
+          <span style={{
+            fontFamily: B.fontMono, fontSize: '0.7rem', fontWeight: '600',
+            color: B.mint, letterSpacing: '0.08em',
+          }}>
+            SIMULADOR DE INVERSIONES
+          </span>
           {tasasLive && (
-            <span style={{ color: '#3EE8A0', fontSize: '0.72rem', marginLeft: '0.5rem' }}>
-              ● Tasas actualizadas vía Banxico
+            <span style={{
+              fontFamily: B.fontMono, fontSize: '0.62rem', fontWeight: '500',
+              color: B.textMuted, marginLeft: '0.5rem',
+              background: B.bgOff, padding: '0.15rem 0.5rem', borderRadius: '4px',
+            }}>
+              Tasas via Banxico
             </span>
           )}
+        </div>
+        <h2 style={{
+          fontFamily: B.fontDisplay, fontWeight: '800',
+          fontSize: 'clamp(1.6rem, 4vw, 2.2rem)',
+          letterSpacing: '-0.03em', lineHeight: 1.1,
+          color: B.ink, margin: '0 0 0.5rem',
+        }}>
+          Compara tu rendimiento
+        </h2>
+        <p style={{
+          color: B.textSoft, fontSize: '0.95rem', lineHeight: 1.6, margin: 0,
+          fontFamily: B.fontBody,
+        }}>
+          Simula como creceria tu inversion en diferentes instrumentos financieros.
         </p>
       </div>
 
-      {/* Controls grid */}
-      <div style={s.controlsGrid}>
+      {/* ── Winner card (prominent, at top) ─────────────── */}
+      {mejor && (
+        <div style={{
+          background: `linear-gradient(135deg, ${B.bgOff} 0%, white 100%)`,
+          border: `1px solid ${B.border}`,
+          borderRadius: '16px', padding: '2rem',
+          marginBottom: '2rem', boxShadow: B.shadowMd,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+            <IconStar size={18} color={B.mint} strokeWidth={2} />
+            <span style={{
+              fontFamily: B.fontMono, fontSize: '0.7rem', fontWeight: '700',
+              color: B.mint, letterSpacing: '0.08em',
+            }}>
+              MAYOR VALOR FINAL{descontarISR ? ' NETO' : ''}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+            <span style={{
+              fontFamily: B.fontDisplay, fontSize: 'clamp(1.3rem, 3vw, 1.6rem)',
+              fontWeight: '800', color: B.ink, letterSpacing: '-0.02em',
+            }}>
+              {mejor.label}
+            </span>
+            <span style={{
+              fontFamily: B.fontMono, fontSize: 'clamp(1.8rem, 4vw, 2.5rem)',
+              fontWeight: '700', color: B.mint, letterSpacing: '-0.02em',
+            }}>
+              {formatMXN(mejor.neto)}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+            <span style={{ fontFamily: B.fontBody, fontSize: '0.85rem', color: B.textSoft }}>
+              Ganancia{descontarISR ? ' neta' : ''}:{' '}
+              <span style={{ fontFamily: B.fontMono, fontWeight: '600', color: mejor.ganancia >= 0 ? B.mint : '#EF4444' }}>
+                {mejor.ganancia >= 0 ? '+' : ''}{formatMXN(mejor.ganancia)}
+              </span>
+            </span>
+            {delta > 0 && (
+              <span style={{ fontFamily: B.fontBody, fontSize: '0.85rem', color: B.textSoft }}>
+                Ventaja vs 2do:{' '}
+                <span style={{ fontFamily: B.fontMono, fontWeight: '600', color: B.blue }}>
+                  +{formatMXN(delta)}
+                </span>
+              </span>
+            )}
+            <span style={{
+              fontFamily: B.fontMono, fontSize: '0.7rem', fontWeight: '600',
+              color: riesgoColor(mejor.riesgo),
+              background: riesgoBg(mejor.riesgo),
+              padding: '0.2rem 0.6rem', borderRadius: '6px',
+              alignSelf: 'center',
+            }}>
+              Riesgo {mejor.riesgoLabel}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Controls ────────────────────────────────────── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: '1rem', marginBottom: '1.5rem',
+      }}>
         {/* Monto inicial */}
         <div style={s.controlGroup}>
           <label htmlFor="sim-monto" style={s.label}>Monto inicial</label>
           <div style={s.inputWrapper}>
             <span style={s.inputPrefix}>$</span>
             <input
-              id="sim-monto"
-              className="sim-input"
-              type="number"
-              min={1000}
-              step={1000}
-              value={montoInicial}
+              id="sim-monto" className="sim-input" type="number"
+              min={1000} step={1000} value={montoInicial}
               onChange={e => setMontoInicial(Math.max(0, Number(e.target.value)))}
               style={s.input}
               aria-label="Monto inicial en pesos mexicanos"
@@ -250,21 +368,17 @@ export default function SimuladorInversiones() {
           </div>
         </div>
 
-        {/* Aportación mensual */}
+        {/* Aportacion mensual */}
         <div style={s.controlGroup}>
-          <label htmlFor="sim-aport" style={s.label}>Aportación mensual</label>
+          <label htmlFor="sim-aport" style={s.label}>Aportacion mensual</label>
           <div style={s.inputWrapper}>
             <span style={s.inputPrefix}>$</span>
             <input
-              id="sim-aport"
-              className="sim-input"
-              type="number"
-              min={0}
-              step={500}
-              value={aportMensual}
+              id="sim-aport" className="sim-input" type="number"
+              min={0} step={500} value={aportMensual}
               onChange={e => setAportMensual(Math.max(0, Number(e.target.value)))}
               style={s.input}
-              aria-label="Aportación mensual en pesos mexicanos"
+              aria-label="Aportacion mensual en pesos mexicanos"
             />
           </div>
         </div>
@@ -272,191 +386,245 @@ export default function SimuladorInversiones() {
         {/* Plazo */}
         <div style={s.controlGroup}>
           <label htmlFor="sim-plazo" style={s.label}>
-            Plazo: <strong style={{ color: '#3EE8A0' }}>{años} {años === 1 ? 'año' : 'años'}</strong>
+            Plazo:{' '}
+            <span style={{ fontFamily: B.fontMono, fontWeight: '700', color: B.blue, fontSize: '1.1rem' }}>
+              {anios}
+            </span>{' '}
+            <span style={{ color: B.textMuted }}>{anios === 1 ? 'anio' : 'anios'}</span>
           </label>
           <input
-            id="sim-plazo"
-            className="sim-slider"
-            type="range"
-            min={1}
-            max={30}
-            value={años}
-            onChange={e => setAños(Number(e.target.value))}
-            aria-label={`Plazo en años: ${años}`}
-            aria-valuemin={1}
-            aria-valuemax={30}
-            aria-valuenow={años}
+            id="sim-plazo" className="sim-slider" type="range"
+            min={1} max={30} value={anios}
+            onChange={e => setAnios(Number(e.target.value))}
+            aria-label={`Plazo en anios: ${anios}`}
+            aria-valuemin={1} aria-valuemax={30} aria-valuenow={anios}
           />
           <div style={s.sliderLabels}>
-            <span>1 año</span><span>30 años</span>
+            <span>1</span><span>15</span><span>30</span>
           </div>
         </div>
 
         {/* ISR toggle */}
-        <div style={{ ...s.controlGroup, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <label htmlFor="sim-isr" style={{ ...s.label, marginBottom: 0 }}>Descontar ISR estimado</label>
+        <div style={{ ...s.controlGroup, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+          <label htmlFor="sim-isr" style={{ ...s.label, marginBottom: 0, flex: 1 }}>
+            Descontar ISR estimado
+          </label>
           <button
-            id="sim-isr"
-            className="sim-toggle"
-            role="switch"
-            aria-checked={descontarISR}
-            aria-label="Descontar ISR estimado"
+            id="sim-isr" className="sim-toggle" role="switch"
+            aria-checked={descontarISR} aria-label="Descontar ISR estimado"
             data-on={String(descontarISR)}
             onClick={() => setDescontarISR(!descontarISR)}
           />
         </div>
       </div>
 
-      {/* Instrument toggles + editable rates */}
-      <div style={s.instrumentsGrid}>
-        {instrumentos.map(inst => (
-          <div key={inst.key} style={{
-            ...s.instrumentCard,
-            borderColor: inst.visible ? `${inst.color}40` : 'rgba(255,255,255,0.06)',
-            opacity: inst.visible ? 1 : 0.5,
+      {/* ── FX toggle ───────────────────────────────────── */}
+      <div style={{
+        background: B.bgOff, border: `1px solid ${B.border}`,
+        borderRadius: '14px', padding: '1rem 1.25rem',
+        marginBottom: '1.5rem',
+        display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: '1 1 auto' }}>
+          <IconGlobe size={16} color={B.blue} strokeWidth={1.8} />
+          <span style={{ fontFamily: B.fontBody, fontSize: '0.85rem', fontWeight: '500', color: B.ink }}>
+            Ajustar S&amp;P 500 por tipo de cambio (MXN/USD)
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {ajustarFX && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <label htmlFor="sim-deprec" style={{ fontFamily: B.fontBody, fontSize: '0.78rem', color: B.textSoft, whiteSpace: 'nowrap' as const }}>
+                Deprec. anual:
+              </label>
+              <input
+                id="sim-deprec" className="sim-input" type="number"
+                min={0} max={20} step={0.5} value={deprecAnual}
+                onChange={e => setDeprecAnual(Math.max(0, Number(e.target.value)))}
+                style={{
+                  width: '60px', padding: '0.3rem 0.4rem',
+                  fontFamily: B.fontMono, fontSize: '0.82rem', fontWeight: '600',
+                  textAlign: 'right' as const,
+                  background: B.bg, border: `1.5px solid ${B.border}`,
+                  borderRadius: '8px', color: B.ink,
+                }}
+                aria-label="Depreciacion anual del peso"
+              />
+              <span style={{ fontFamily: B.fontMono, fontSize: '0.78rem', color: B.textMuted }}>%</span>
+            </div>
+          )}
+          <button
+            className="sim-toggle" role="switch"
+            aria-checked={ajustarFX} aria-label="Ajustar por tipo de cambio"
+            data-on={String(ajustarFX)}
+            onClick={() => setAjustarFX(!ajustarFX)}
+          />
+        </div>
+        {ajustarFX && (
+          <p style={{
+            width: '100%', margin: '0.25rem 0 0', fontSize: '0.72rem',
+            color: B.textMuted, fontFamily: B.fontBody, lineHeight: 1.6,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            Convierte el rendimiento del S&amp;P 500 de USD a MXN asumiendo una depreciacion del peso de {formatPct(deprecAnual)} anual.
+            Historicamente el peso se ha depreciado ~4% anual frente al dolar.
+          </p>
+        )}
+      </div>
+
+      {/* ── Instrument cards ────────────────────────────── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+        gap: '0.75rem', marginBottom: '2rem',
+      }}>
+        {instrumentos.map(inst => (
+          <div key={inst.key} className="inst-card" style={{
+            background: B.bg,
+            border: `1.5px solid ${inst.visible ? `${inst.color}40` : B.border}`,
+            borderRadius: '14px', padding: '1.25rem',
+            opacity: inst.visible ? 1 : 0.55,
+            boxShadow: B.shadow,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: inst.color }} />
-                <span style={{ color: 'white', fontSize: '0.78rem', fontWeight: '600' }}>{inst.label}</span>
+                <div style={{
+                  width: '12px', height: '12px', borderRadius: '4px', background: inst.color,
+                }} />
+                <span style={{ fontFamily: B.fontDisplay, fontSize: '0.85rem', fontWeight: '700', color: B.ink }}>
+                  {inst.label}
+                </span>
               </div>
               <button
-                className="sim-toggle"
-                role="switch"
+                className="sim-toggle" role="switch"
                 aria-checked={inst.visible}
-                aria-label={`Mostrar ${inst.label} en gráfica`}
+                aria-label={`Mostrar ${inst.label} en grafica`}
                 data-on={String(inst.visible)}
                 onClick={() => toggleVisible(inst.key)}
-                style={{ width: '32px', height: '18px' }}
+                style={{ width: '36px', height: '20px' }}
               />
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.35rem', marginBottom: '0.5rem' }}>
               <input
-                className="sim-input"
-                type="number"
-                step={0.01}
-                min={0}
-                max={100}
-                value={inst.tasa}
+                className="sim-input" type="number"
+                step={0.01} min={0} max={100} value={inst.tasa}
                 onChange={e => updateTasa(inst.key, Number(e.target.value))}
-                style={{ ...s.input, width: '80px', padding: '0.35rem 0.5rem', fontSize: '0.82rem', textAlign: 'right' as const }}
+                style={{
+                  width: '80px', padding: '0.4rem 0.5rem',
+                  fontFamily: B.fontMono, fontSize: '1rem', fontWeight: '700',
+                  textAlign: 'right' as const, color: B.ink,
+                  background: B.bgOff, border: `1.5px solid ${B.border}`, borderRadius: '8px',
+                }}
                 aria-label={`Tasa anual de ${inst.label}`}
               />
-              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>% anual</span>
-            </div>
-            <div style={{ marginTop: '0.4rem' }}>
-              <span style={{
-                fontSize: '0.62rem',
-                fontWeight: '700',
-                color: riesgoColor(inst.riesgo),
-                background: `${riesgoColor(inst.riesgo)}15`,
-                padding: '0.15rem 0.45rem',
-                borderRadius: '4px',
-                letterSpacing: '0.05em',
-              }}>
-                RIESGO {inst.riesgo}
+              <span style={{ fontFamily: B.fontMono, fontSize: '0.78rem', color: B.textMuted, fontWeight: '500' }}>
+                % anual
               </span>
             </div>
+            {inst.key === 'sp500' && ajustarFX && (
+              <div style={{ marginBottom: '0.4rem' }}>
+                <span style={{
+                  fontFamily: B.fontMono, fontSize: '0.68rem', fontWeight: '600',
+                  color: B.blue, background: `${B.blue}10`, padding: '0.15rem 0.4rem', borderRadius: '4px',
+                }}>
+                  Efectiva MXN: {formatPct(((1 + inst.tasa / 100) * (1 + deprecAnual / 100) - 1) * 100)}
+                </span>
+              </div>
+            )}
+            <span style={{
+              fontFamily: B.fontMono, fontSize: '0.65rem', fontWeight: '700',
+              color: riesgoColor(inst.riesgo),
+              background: riesgoBg(inst.riesgo),
+              padding: '0.2rem 0.5rem', borderRadius: '5px',
+              letterSpacing: '0.04em',
+            }}>
+              RIESGO {inst.riesgo}
+            </span>
           </div>
         ))}
       </div>
 
-      {/* Chart */}
-      <div style={s.chartContainer}>
+      {/* ── Chart ───────────────────────────────────────── */}
+      <div style={{
+        background: B.bg, border: `1px solid ${B.border}`,
+        borderRadius: '16px', padding: '1.5rem',
+        marginBottom: '1.5rem', boxShadow: B.shadow,
+      }}>
         <h3 style={s.sectionTitle}>Crecimiento proyectado</h3>
-        <div style={{ width: '100%', height: 360 }}>
-          <ResponsiveContainer>
-            <LineChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-              <XAxis
-                dataKey="año"
-                stroke="rgba(255,255,255,0.3)"
-                fontSize={12}
-                tickFormatter={(v: number) => `${v}a`}
-              />
-              <YAxis
-                stroke="rgba(255,255,255,0.3)"
-                fontSize={11}
-                tickFormatter={(v: number) => {
-                  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`
-                  if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}K`
-                  return `$${v}`
-                }}
-                width={65}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: '#0D1117',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '10px',
-                  fontSize: '0.78rem',
-                  color: 'white',
-                }}
-                labelFormatter={(v) => `Año ${v}`}
-                formatter={(value, name) => {
-                  const inst = instrumentos.find(i => i.key === String(name))
-                  return [formatMXN(Number(value)), inst?.label ?? String(name)]
-                }}
-              />
-              <Legend
-                wrapperStyle={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}
-                formatter={(value: string) => {
-                  const inst = instrumentos.find(i => i.key === value)
-                  return inst?.label ?? value
-                }}
-              />
-              {instrumentos.filter(i => i.visible).map(inst => (
-                <Line
-                  key={inst.key}
-                  type="monotone"
-                  dataKey={inst.key}
-                  stroke={inst.color}
-                  strokeWidth={2.5}
-                  dot={false}
-                  activeDot={{ r: 5, strokeWidth: 0, fill: inst.color }}
+        <div style={{ width: '100%', height: 380 }}>
+          {mounted ? (
+            <ResponsiveContainer>
+              <LineChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={B.border} />
+                <XAxis
+                  dataKey="year" stroke={B.textMuted} fontSize={12}
+                  fontFamily={B.fontMono}
+                  tickFormatter={(v: number) => `${v}a`}
                 />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
+                <YAxis
+                  stroke={B.textMuted} fontSize={11}
+                  fontFamily={B.fontMono}
+                  tickFormatter={(v: number) => {
+                    if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`
+                    if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}K`
+                    return `$${v}`
+                  }}
+                  width={65}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: B.bg, border: `1px solid ${B.border}`,
+                    borderRadius: '12px', fontSize: '0.82rem', color: B.ink,
+                    boxShadow: B.shadowMd, fontFamily: B.fontMono,
+                  }}
+                  labelFormatter={(v) => `Anio ${v}`}
+                  formatter={(value, name) => {
+                    const inst = instrumentos.find(i => i.key === String(name))
+                    return [formatMXN(Number(value)), inst?.label ?? String(name)]
+                  }}
+                />
+                <Legend
+                  wrapperStyle={{ fontSize: '0.78rem', fontFamily: B.fontBody, color: B.textSoft }}
+                  formatter={(value: string) => {
+                    const inst = instrumentos.find(i => i.key === value)
+                    return inst?.label ?? value
+                  }}
+                />
+                {instrumentos.filter(i => i.visible).map(inst => (
+                  <Line
+                    key={inst.key} type="monotone" dataKey={inst.key}
+                    stroke={inst.color} strokeWidth={2.5}
+                    dot={false}
+                    activeDot={{ r: 5, strokeWidth: 0, fill: inst.color }}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div style={{
+              height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: B.textMuted, fontFamily: B.fontBody, fontSize: '0.88rem',
+            }}>
+              Cargando grafica...
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Winner card */}
-      {mejorResultado && (
-        <div className="winner-card" style={s.winnerCard}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3EE8A0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-            </svg>
-            <span style={{ color: '#3EE8A0', fontSize: '0.72rem', fontWeight: '700', letterSpacing: '0.1em' }}>
-              MAYOR VALOR FINAL{descontarISR ? ' NETO' : ''}
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <span style={{ color: 'white', fontSize: '1.5rem', fontWeight: '800', letterSpacing: '-0.02em' }}>
-              {mejorResultado.label}
-            </span>
-            <span style={{ color: '#3EE8A0', fontSize: '1.3rem', fontWeight: '700' }}>
-              {formatMXN(mejorResultado.neto)}
-            </span>
-          </div>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', marginTop: '0.5rem' }}>
-            Ganancia{descontarISR ? ' neta' : ''}: {formatMXN(mejorResultado.ganancia)} · Riesgo: {mejorResultado.riesgo}
-          </p>
-        </div>
-      )}
-
-      {/* Results table */}
-      <div style={s.tableContainer}>
+      {/* ── Results table ───────────────────────────────── */}
+      <div style={{
+        background: B.bg, border: `1px solid ${B.border}`,
+        borderRadius: '16px', padding: '1.5rem',
+        marginBottom: '1.5rem', boxShadow: B.shadow,
+      }}>
         <h3 style={s.sectionTitle}>Comparativa detallada</h3>
         <div style={{ overflowX: 'auto' }}>
-          <table style={s.table} role="table">
+          <table style={{ width: '100%', borderCollapse: 'collapse' as const }} role="table">
             <thead>
               <tr>
                 <th style={s.th}>Instrumento</th>
                 <th style={{ ...s.th, textAlign: 'right' as const }}>Tasa</th>
                 <th style={{ ...s.th, textAlign: 'right' as const }}>Valor bruto</th>
-                {descontarISR && <th style={{ ...s.th, textAlign: 'right' as const }}>ISR estimado</th>}
+                {descontarISR && <th style={{ ...s.th, textAlign: 'right' as const }}>ISR</th>}
                 <th style={{ ...s.th, textAlign: 'right' as const }}>Valor {descontarISR ? 'neto' : 'final'}</th>
                 <th style={{ ...s.th, textAlign: 'right' as const }}>Ganancia</th>
                 <th style={{ ...s.th, textAlign: 'center' as const }}>Riesgo</th>
@@ -464,44 +632,47 @@ export default function SimuladorInversiones() {
             </thead>
             <tbody>
               {resultados.map((r, i) => (
-                <tr key={r.key} className="result-row" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <tr key={r.key} className="result-row" style={{ borderBottom: `1px solid ${B.borderLight}` }}>
                   <td style={s.td}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '3px', background: r.color }} />
-                      <span style={{ fontWeight: i === 0 ? '700' : '400', color: i === 0 ? '#3EE8A0' : 'rgba(255,255,255,0.8)' }}>
+                      <div style={{ width: '10px', height: '10px', borderRadius: '4px', background: r.color }} />
+                      <span style={{
+                        fontFamily: B.fontDisplay, fontWeight: i === 0 ? '700' : '500',
+                        color: i === 0 ? B.ink : B.textSoft, fontSize: '0.88rem',
+                      }}>
                         {r.label}
                       </span>
-                      {i === 0 && <span style={{ fontSize: '0.6rem', color: '#3EE8A0', fontWeight: '700' }}>★</span>}
+                      {i === 0 && <IconStar size={12} color={B.mint} strokeWidth={2.5} />}
                     </div>
                   </td>
-                  <td style={{ ...s.td, textAlign: 'right' as const, fontFamily: "'DM Sans', monospace" }}>
-                    {formatPct(instrumentos.find(x => x.key === r.key)?.tasa ?? 0)}
+                  <td style={{ ...s.td, textAlign: 'right' as const, fontFamily: B.fontMono, fontWeight: '600' }}>
+                    {formatPct(r.tasa)}
                   </td>
-                  <td style={{ ...s.td, textAlign: 'right' as const, fontFamily: "'DM Sans', monospace" }}>
+                  <td style={{ ...s.td, textAlign: 'right' as const, fontFamily: B.fontMono }}>
                     {formatMXN(r.bruto)}
                   </td>
                   {descontarISR && (
-                    <td style={{ ...s.td, textAlign: 'right' as const, color: '#FF6B6B', fontFamily: "'DM Sans', monospace" }}>
-                      −{formatMXN(r.isr)}
+                    <td style={{ ...s.td, textAlign: 'right' as const, fontFamily: B.fontMono, color: '#EF4444' }}>
+                      -{formatMXN(r.isr)}
                     </td>
                   )}
-                  <td style={{ ...s.td, textAlign: 'right' as const, fontWeight: '600', color: 'white', fontFamily: "'DM Sans', monospace" }}>
+                  <td style={{ ...s.td, textAlign: 'right' as const, fontFamily: B.fontMono, fontWeight: '700', color: B.ink }}>
                     {formatMXN(r.neto)}
                   </td>
-                  <td style={{ ...s.td, textAlign: 'right' as const, color: r.ganancia >= 0 ? '#3EE8A0' : '#FF4444', fontFamily: "'DM Sans', monospace" }}>
+                  <td style={{
+                    ...s.td, textAlign: 'right' as const, fontFamily: B.fontMono, fontWeight: '600',
+                    color: r.ganancia >= 0 ? B.mint : '#EF4444',
+                  }}>
                     {r.ganancia >= 0 ? '+' : ''}{formatMXN(r.ganancia)}
                   </td>
                   <td style={{ ...s.td, textAlign: 'center' as const }}>
                     <span style={{
-                      fontSize: '0.62rem',
-                      fontWeight: '700',
+                      fontFamily: B.fontMono, fontSize: '0.65rem', fontWeight: '700',
                       color: riesgoColor(r.riesgo),
-                      background: `${riesgoColor(r.riesgo)}15`,
-                      padding: '0.15rem 0.45rem',
-                      borderRadius: '4px',
-                      letterSpacing: '0.05em',
+                      background: riesgoBg(r.riesgo),
+                      padding: '0.2rem 0.5rem', borderRadius: '5px',
                     }}>
-                      {r.riesgo}
+                      {r.riesgoLabel}
                     </span>
                   </td>
                 </tr>
@@ -511,24 +682,37 @@ export default function SimuladorInversiones() {
         </div>
       </div>
 
-      {/* Risk notes */}
-      <div style={s.notesContainer}>
+      {/* ── Risk notes + disclaimer ─────────────────────── */}
+      <div style={{
+        background: B.bgOff, border: `1px solid ${B.border}`,
+        borderRadius: '16px', padding: '1.5rem',
+      }}>
         <h3 style={{ ...s.sectionTitle, marginBottom: '0.75rem' }}>Notas de riesgo</h3>
         {instrumentos.map(inst => (
-          <div key={inst.key} style={s.noteRow}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '3px', background: inst.color, flexShrink: 0, marginTop: '0.2rem' }} />
-            <div>
-              <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', fontWeight: '600' }}>{inst.label}</span>
-              <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.72rem' }}> — {inst.riesgoNota}</span>
-            </div>
+          <div key={inst.key} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'flex-start' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '3px', background: inst.color, flexShrink: 0, marginTop: '0.3rem' }} />
+            <p style={{ margin: 0, fontSize: '0.82rem', lineHeight: 1.6 }}>
+              <span style={{ fontFamily: B.fontDisplay, fontWeight: '600', color: B.ink }}>{inst.label}</span>
+              <span style={{ color: B.textSoft }}> &mdash; {inst.riesgoNota}</span>
+            </p>
           </div>
         ))}
-        <div style={s.disclaimer}>
-          <p>
-            <strong>Disclaimer:</strong> Este simulador es una herramienta ilustrativa. Los rendimientos pasados no garantizan resultados futuros.
-            Las tasas de CETES se obtienen del SIE de Banxico. El ISR sobre intereses usa la tasa de retención provisional
-            del art. 21 LIF 2026 (0.90% anual sobre capital). S&P 500 considera rendimiento promedio histórico nominal en USD
-            sin ajuste por tipo de cambio. Consulta a un asesor financiero antes de invertir.
+
+        <div style={{
+          marginTop: '1.25rem', padding: '1rem',
+          background: B.bg, borderRadius: '10px', border: `1px solid ${B.border}`,
+        }}>
+          <p style={{
+            margin: 0, color: B.textMuted, fontSize: '0.72rem',
+            lineHeight: 1.7, fontFamily: B.fontBody,
+          }}>
+            <strong style={{ color: B.textSoft }}>Disclaimer:</strong> Este simulador es una herramienta ilustrativa.
+            Los rendimientos pasados no garantizan resultados futuros.
+            Las tasas de CETES se obtienen del SIE de Banxico.
+            El ISR sobre intereses usa la tasa de retencion provisional del art. 21 LIF 2026 (0.90% anual sobre capital).
+            S&amp;P 500 considera rendimiento promedio historico nominal en USD
+            {ajustarFX ? `, ajustado por depreciacion del peso de ${formatPct(deprecAnual)} anual` : ' sin ajuste por tipo de cambio'}.
+            Consulta a un asesor financiero antes de invertir.
           </p>
         </div>
       </div>
@@ -539,50 +723,18 @@ export default function SimuladorInversiones() {
 /* ─── Styles ─────────────────────────────────────────────────── */
 
 const s: Record<string, React.CSSProperties> = {
-  wrapper: {
-    width: '100%',
-    maxWidth: '900px',
-    margin: '0 auto',
-  },
-  header: {
-    marginBottom: '2rem',
-  },
-  tag: {
-    color: '#3EE8A0',
-    fontSize: '0.68rem',
-    fontWeight: '700',
-    letterSpacing: '0.1em',
-  },
-  title: {
-    color: 'white',
-    fontSize: 'clamp(1.5rem, 4vw, 2.2rem)',
-    fontWeight: '800',
-    letterSpacing: '-0.03em',
-    lineHeight: 1.15,
-    margin: '0 0 0.5rem',
-  },
-  subtitle: {
-    color: 'rgba(255,255,255,0.45)',
-    fontSize: '0.88rem',
-    lineHeight: 1.7,
-    margin: 0,
-  },
-  controlsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '1rem',
-    marginBottom: '1.5rem',
-  },
   controlGroup: {
-    background: 'rgba(255,255,255,0.02)',
-    border: '1px solid rgba(255,255,255,0.06)',
-    borderRadius: '12px',
-    padding: '1rem',
+    background: B.bg,
+    border: `1px solid ${B.border}`,
+    borderRadius: '14px',
+    padding: '1.25rem',
+    boxShadow: B.shadow,
   },
   label: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: '0.75rem',
+    color: B.textSoft,
+    fontSize: '0.82rem',
     fontWeight: '500',
+    fontFamily: B.fontBody,
     marginBottom: '0.5rem',
     display: 'block',
   },
@@ -593,117 +745,59 @@ const s: Record<string, React.CSSProperties> = {
   },
   inputPrefix: {
     position: 'absolute' as const,
-    left: '0.75rem',
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: '0.85rem',
-    fontWeight: '500',
+    left: '0.85rem',
+    color: B.textMuted,
+    fontSize: '1rem',
+    fontWeight: '600',
+    fontFamily: B.fontMono,
     pointerEvents: 'none' as const,
   },
   input: {
     width: '100%',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: '8px',
-    padding: '0.6rem 0.75rem 0.6rem 1.75rem',
-    color: 'white',
-    fontSize: '0.9rem',
-    fontFamily: "'DM Sans', sans-serif",
+    background: B.bgOff,
+    border: `1.5px solid ${B.border}`,
+    borderRadius: '10px',
+    padding: '0.7rem 0.85rem 0.7rem 2rem',
+    color: B.ink,
+    fontSize: '1.1rem',
+    fontFamily: B.fontMono,
+    fontWeight: '700',
     outline: 'none',
     boxSizing: 'border-box' as const,
-    transition: 'border-color 0.15s',
   },
   sliderLabels: {
     display: 'flex',
     justifyContent: 'space-between',
-    color: 'rgba(255,255,255,0.25)',
-    fontSize: '0.65rem',
+    color: B.textMuted,
+    fontSize: '0.68rem',
+    fontFamily: B.fontMono,
     marginTop: '0.35rem',
   },
-  instrumentsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
-    gap: '0.75rem',
-    marginBottom: '2rem',
-  },
-  instrumentCard: {
-    background: 'rgba(255,255,255,0.02)',
-    border: '1px solid rgba(255,255,255,0.06)',
-    borderRadius: '12px',
-    padding: '1rem',
-    transition: 'border-color 0.2s',
-  },
-  chartContainer: {
-    background: 'rgba(255,255,255,0.02)',
-    border: '1px solid rgba(255,255,255,0.06)',
-    borderRadius: '12px',
-    padding: '1.5rem',
-    marginBottom: '1.5rem',
-  },
   sectionTitle: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: '0.78rem',
+    fontFamily: B.fontMono,
+    color: B.textMuted,
+    fontSize: '0.72rem',
     fontWeight: '600',
-    letterSpacing: '0.05em',
+    letterSpacing: '0.08em',
     textTransform: 'uppercase' as const,
-    marginBottom: '1rem',
     margin: '0 0 1rem',
   },
-  winnerCard: {
-    background: 'rgba(62,232,160,0.04)',
-    border: '1px solid rgba(62,232,160,0.15)',
-    borderRadius: '14px',
-    padding: '1.5rem',
-    marginBottom: '1.5rem',
-  },
-  tableContainer: {
-    background: 'rgba(255,255,255,0.02)',
-    border: '1px solid rgba(255,255,255,0.06)',
-    borderRadius: '12px',
-    padding: '1.5rem',
-    marginBottom: '1.5rem',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse' as const,
-    fontSize: '0.8rem',
-  },
   th: {
-    color: 'rgba(255,255,255,0.35)',
+    fontFamily: B.fontMono,
+    color: B.textMuted,
     fontSize: '0.68rem',
     fontWeight: '600',
     letterSpacing: '0.05em',
     textTransform: 'uppercase' as const,
     padding: '0.6rem 0.75rem',
-    borderBottom: '1px solid rgba(255,255,255,0.08)',
+    borderBottom: `2px solid ${B.border}`,
     textAlign: 'left' as const,
     whiteSpace: 'nowrap' as const,
   },
   td: {
-    padding: '0.75rem',
-    color: 'rgba(255,255,255,0.65)',
-    fontSize: '0.8rem',
+    padding: '0.85rem 0.75rem',
+    color: B.textSoft,
+    fontSize: '0.85rem',
     whiteSpace: 'nowrap' as const,
-  },
-  notesContainer: {
-    background: 'rgba(255,255,255,0.02)',
-    border: '1px solid rgba(255,255,255,0.06)',
-    borderRadius: '12px',
-    padding: '1.5rem',
-  },
-  noteRow: {
-    display: 'flex',
-    gap: '0.5rem',
-    marginBottom: '0.5rem',
-    alignItems: 'flex-start',
-  },
-  disclaimer: {
-    marginTop: '1rem',
-    padding: '1rem',
-    background: 'rgba(255,255,255,0.02)',
-    borderRadius: '8px',
-    border: '1px solid rgba(255,255,255,0.05)',
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: '0.68rem',
-    lineHeight: 1.7,
   },
 }

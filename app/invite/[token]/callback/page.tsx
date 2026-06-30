@@ -50,7 +50,6 @@ export default function InviteCallbackPage({ params }: { params: Promise<{ token
         <div style={{ color: '#94A3B8', fontSize: '0.85rem' }}>Serás redirigido al formulario KYC</div>
       </div>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
     </div>

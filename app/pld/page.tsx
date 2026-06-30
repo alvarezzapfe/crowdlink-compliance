@@ -512,7 +512,6 @@ export default function PldPage() {
   return (
     <div style={{ minHeight: '100vh', background: navy, display: 'flex', fontFamily: font, color: textPrimary }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { margin: 0; padding: 0; overflow-x: hidden; }
         @keyframes spin { to { transform: rotate(360deg); } }

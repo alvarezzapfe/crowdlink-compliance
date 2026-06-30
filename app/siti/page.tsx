@@ -16,7 +16,6 @@ export default function SitiPage() {
         </p>
         <a href="/gate" style={{ color: '#9333EA', fontSize: '0.875rem', fontWeight: '600', textDecoration: 'none' }}>← Volver al hub</a>
       </div>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');`}</style>
     </div>
   )
 }
